@@ -4,8 +4,10 @@ import { useLiveQuery } from "dexie-react-hooks"
 import { db } from "@/lib/db"
 import { formatCurrency } from "@/lib/currencies"
 import { useDefaultCurrency } from "@/hooks/use-settings"
+import { getIcon } from "@/lib/icons"
 import { CurrencySelector } from "@/components/dashboard/currency-selector"
 import { QuickAdd } from "@/components/dashboard/quick-add"
+import { ExpenseDonut } from "@/components/dashboard/expense-donut"
 import { format, startOfMonth, endOfMonth } from "date-fns"
 import type { Category } from "@/types"
 
@@ -20,10 +22,9 @@ export default function DashboardPage() {
     () => db.transactions
       .where("date")
       .between(monthStart, monthEnd, true, true)
-      .and(t => t.currency === currency)
       .reverse()
       .sortBy("date"),
-    [monthStart, monthEnd, currency]
+    [monthStart, monthEnd]
   )
 
   const categories = useLiveQuery(() => db.categories.toArray())
@@ -76,6 +77,15 @@ export default function DashboardPage() {
       {/* Quick Add */}
       <QuickAdd />
 
+      {/* Expense Breakdown Donut */}
+      {transactions && transactions.length > 0 && (
+        <ExpenseDonut
+          transactions={transactions}
+          categoryMap={categoryMap}
+          currency={currency}
+        />
+      )}
+
       {/* Recent Transactions */}
       <div className="space-y-2">
         <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
@@ -91,13 +101,14 @@ export default function DashboardPage() {
           <div className="border divide-y">
             {recentTransactions.map((t) => {
               const cat = categoryMap.get(t.categoryId)
+              const Icon = getIcon(cat?.icon || "MoreHorizontal")
               return (
                 <div key={t.id} className="flex items-center justify-between p-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">{cat?.name.split(" ")[0] || "📦"}</span>
+                    <Icon className="h-5 w-5" style={{ color: cat?.color || "#6b7280" }} />
                     <div>
                       <div className="text-sm font-medium">
-                        {cat?.name.replace(/^[^\s]+\s/, "") || "Unknown"}
+                        {cat?.name || "Unknown"}
                       </div>
                       <div className="text-xs text-muted-foreground mono">
                         {format(new Date(t.date), "MMM d")}

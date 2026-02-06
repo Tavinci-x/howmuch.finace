@@ -39,9 +39,12 @@ export function getDateRange(range: TimeRange): { start: Date; end: Date } {
 }
 
 export function getLast6Months(): string[] {
+  const currentYear = new Date().getFullYear()
   const months: string[] = []
-  for (let i = 5; i >= 0; i--) {
-    months.push(format(subMonths(new Date(), i), 'yyyy-MM'))
+
+  // All 12 months of the current year (January to December)
+  for (let i = 0; i < 12; i++) {
+    months.push(format(new Date(currentYear, i, 1), 'yyyy-MM'))
   }
   return months
 }

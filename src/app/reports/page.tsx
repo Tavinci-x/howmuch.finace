@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/currencies"
 import { getDateRange, getLast6Months } from "@/lib/utils"
 import { format, subMonths, startOfMonth, endOfMonth, differenceInDays } from "date-fns"
 import type { TimeRange } from "@/types"
+import { getIcon } from "@/lib/icons"
 
 import { TimeRangeSelector } from "@/components/reports/time-range-selector"
 import { IncomeVsExpense } from "@/components/reports/income-vs-expense"
@@ -35,12 +36,14 @@ export default function ReportsPage() {
     })
 
     // Spending by category
-    const spendingMap: Record<string, { name: string; value: number }> = {}
+    const spendingMap: Record<string, { name: string; value: number; icon: string; color: string }> = {}
     for (const t of filtered) {
       if (t.type !== 'expense') continue
       const cat = categoryMap.get(t.categoryId)
-      const name = cat?.name || '📦 Other'
-      if (!spendingMap[name]) spendingMap[name] = { name, value: 0 }
+      const name = cat?.name || 'Other'
+      const icon = cat?.icon || 'MoreHorizontal'
+      const color = cat?.color || '#6b7280'
+      if (!spendingMap[name]) spendingMap[name] = { name, value: 0, icon, color }
       spendingMap[name].value += t.amount
     }
     const spendingByCategory = Object.values(spendingMap).sort((a, b) => b.value - a.value)
@@ -159,7 +162,10 @@ export default function ReportsPage() {
                   return (
                     <div key={item.name} className="p-3 space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm">{item.name}</span>
+                        <div className="flex items-center gap-2">
+                          {(() => { const Icon = getIcon(item.icon); return <Icon className="h-4 w-4" style={{ color: item.color }} />; })()}
+                          <span className="text-sm">{item.name}</span>
+                        </div>
                         <span className="mono text-sm">
                           {formatCurrency(item.value, currency)}
                         </span>

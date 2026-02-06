@@ -9,12 +9,12 @@
   .text-balance {
     text-wrap: balance;
   }
-  
+
   /* Monospace utility for financial figures */
   .mono {
     font-family: 'JetBrains Mono', monospace;
   }
-  
+
   /* Receipt-style divider */
   .divider {
     @apply border-t border-dashed border-border my-4;
@@ -48,12 +48,12 @@
     --chart-4: 0 0% 80%;
     --chart-5: 0 0% 90%;
     --radius: 0rem;
-    
+
     /* Success/positive amounts */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 98%;
   }
-  
+
   .dark {
     --background: 0 0% 5%;
     --foreground: 0 0% 98%;
@@ -79,7 +79,7 @@
     --chart-3: 0 0% 40%;
     --chart-4: 0 0% 30%;
     --chart-5: 0 0% 20%;
-    
+
     --success: 142 76% 46%;
     --success-foreground: 0 0% 5%;
   }
@@ -89,12 +89,17 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-family: 'JetBrains Mono', monospace;
   }
-  
+
   /* Sharp corners for minimal design */
-  .rounded-lg, .rounded-md, .rounded-xl, .rounded-2xl {
+  .rounded-lg,
+  .rounded-md,
+  .rounded-xl,
+  .rounded-2xl {
     border-radius: 0 !important;
   }
 }
