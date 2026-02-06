@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { db } from "@/lib/db"
 import { formatCurrency } from "@/lib/currencies"
@@ -7,12 +8,30 @@ import { useDefaultCurrency } from "@/hooks/use-settings"
 import { getIcon } from "@/lib/icons"
 import { CurrencySelector } from "@/components/dashboard/currency-selector"
 import { QuickAdd } from "@/components/dashboard/quick-add"
-import { ExpenseDonut } from "@/components/dashboard/expense-donut"
+import { BreakdownDonut } from "@/components/dashboard/expense-donut"
+import { TransactionForm } from "@/components/transactions/transaction-form"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { MoreVertical, Pencil, Trash2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { format, startOfMonth, endOfMonth } from "date-fns"
-import type { Category } from "@/types"
+import type { Category, Transaction } from "@/types"
 
 export default function DashboardPage() {
   const currency = useDefaultCurrency()
+  const { toast } = useToast()
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+
+  async function handleDelete(id: string) {
+    await db.transactions.delete(id)
+    toast({ title: "Transaction deleted" })
+  }
 
   const now = new Date()
   const monthStart = format(startOfMonth(now), "yyyy-MM-dd")
@@ -60,7 +79,14 @@ export default function DashboardPage() {
           </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-sm text-muted-foreground uppercase tracking-wide">Expenses</span>
+          <div>
+            <span className="text-sm text-muted-foreground uppercase tracking-wide">Expenses</span>
+            {income > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {((expenses / income) * 100).toFixed(1)}% of income spent
+              </p>
+            )}
+          </div>
           <span className="mono text-lg text-red-600 dark:text-red-400">
             -{formatCurrency(expenses, currency)}
           </span>
@@ -77,13 +103,18 @@ export default function DashboardPage() {
       {/* Quick Add */}
       <QuickAdd />
 
-      {/* Expense Breakdown Donut */}
+      {/* Income and Expenses Breakdown */}
       {transactions && transactions.length > 0 && (
-        <ExpenseDonut
-          transactions={transactions}
-          categoryMap={categoryMap}
-          currency={currency}
-        />
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Income and Expenses Breakdown
+          </h2>
+          <div className="border p-4 flex gap-4">
+            <BreakdownDonut transactions={transactions} categoryMap={categoryMap} type="income" />
+            <div className="w-px bg-border shrink-0" />
+            <BreakdownDonut transactions={transactions} categoryMap={categoryMap} type="expense" />
+          </div>
+        </div>
       )}
 
       {/* Recent Transactions */}
@@ -103,11 +134,11 @@ export default function DashboardPage() {
               const cat = categoryMap.get(t.categoryId)
               const Icon = getIcon(cat?.icon || "MoreHorizontal")
               return (
-                <div key={t.id} className="flex items-center justify-between p-3">
-                  <div className="flex items-center gap-3">
-                    <Icon className="h-5 w-5" style={{ color: cat?.color || "#6b7280" }} />
-                    <div>
-                      <div className="text-sm font-medium">
+                <div key={t.id} className="flex items-center gap-3 p-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <Icon className="h-5 w-5 shrink-0" style={{ color: cat?.color || "#6b7280" }} />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium truncate">
                         {cat?.name || "Unknown"}
                       </div>
                       <div className="text-xs text-muted-foreground mono">
@@ -115,15 +146,39 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </div>
-                  <span className={`mono font-medium ${t.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  <span className={`mono font-medium text-right shrink-0 ${t.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                     {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount, currency)}
                   </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => { setEditingTx(t); setFormOpen(true) }}>
+                        <Pencil className="h-4 w-4 mr-2" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDelete(t.id)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               )
             })}
           </div>
         )}
       </div>
+
+      <TransactionForm
+        open={formOpen}
+        onOpenChange={(open) => { setFormOpen(open); if (!open) setEditingTx(null) }}
+        transaction={editingTx}
+      />
     </div>
   )
 }

@@ -97,8 +97,23 @@ export function CategoryManager() {
     toast({ title: "Category deleted" })
   }
 
-  const expenseCategories = categories?.filter(c => c.type === 'expense' || c.type === 'both') || []
-  const incomeCategories = categories?.filter(c => c.type === 'income' || c.type === 'both') || []
+  const expenseOrder = ['Housing', 'Food & Dining', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Education', 'Subscriptions', 'Other']
+  const incomeOrder = ['Salary', 'Freelance', 'Gifts', 'Investments', 'Other Income']
+
+  function sortByPreferred(cats: Category[], order: string[]) {
+    return [...cats].sort((a, b) => {
+      const aName = a.name.replace(/^[^\w]*/, '')
+      const bName = b.name.replace(/^[^\w]*/, '')
+      const aIdx = order.findIndex(o => aName.includes(o))
+      const bIdx = order.findIndex(o => bName.includes(o))
+      const aPri = aIdx >= 0 ? aIdx : order.length
+      const bPri = bIdx >= 0 ? bIdx : order.length
+      return aPri - bPri
+    })
+  }
+
+  const expenseCategories = sortByPreferred(categories?.filter(c => c.type === 'expense' || c.type === 'both') || [], expenseOrder)
+  const incomeCategories = sortByPreferred(categories?.filter(c => c.type === 'income' || c.type === 'both') || [], incomeOrder)
 
   return (
     <>
