@@ -1,9 +1,8 @@
 import type { Metadata } from "next"
 import "./globals.css"
 import { ThemeProvider } from "@/components/providers/theme-provider"
-import { DBProvider } from "@/components/providers/db-provider"
-import { Sidebar } from "@/components/layout/sidebar"
-import { MobileNav } from "@/components/layout/mobile-nav"
+import { AuthProvider } from "@/components/providers/auth-provider"
+import { AppShell } from "@/components/layout/app-shell"
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
@@ -25,18 +24,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <DBProvider>
-            <div className="flex min-h-screen">
-              <Sidebar />
-              <main className="flex-1 md:ml-56">
-                <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-3xl mx-auto">
-                  {children}
-                </div>
-              </main>
-              <MobileNav />
-            </div>
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
             <Toaster />
-          </DBProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

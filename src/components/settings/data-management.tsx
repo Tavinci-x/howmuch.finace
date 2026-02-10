@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { db } from "@/lib/db"
 import { seedDatabase } from "@/lib/seed"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,6 +12,7 @@ import { useToast } from "@/hooks/use-toast"
 
 export function DataManagement() {
   const { toast } = useToast()
+  const [showConfirm, setShowConfirm] = useState(false)
 
   async function handleExport() {
     const data = {
@@ -77,6 +79,7 @@ export function DataManagement() {
     await db.goals.clear()
     await db.settings.clear()
     await seedDatabase()
+    setShowConfirm(false)
     toast({ title: "All data cleared and defaults restored" })
   }
 
@@ -110,14 +113,33 @@ export function DataManagement() {
 
         <Separator />
 
-        <div>
-          <p className="text-sm text-muted-foreground mb-3">
-            This will delete all your data and restore default categories. This action cannot be undone.
-          </p>
-          <Button variant="destructive" onClick={handleClearAll}>
-            <Trash2 className="h-4 w-4 mr-2" /> Clear All Data
-          </Button>
-        </div>
+        {showConfirm ? (
+          <div className="border border-destructive/50 bg-destructive/5 p-4 space-y-3">
+            <p className="text-sm font-medium text-destructive">
+              ⚠️ Are you sure you want to clear all data?
+            </p>
+            <p className="text-sm text-muted-foreground">
+              You will lose all your transactions, categories, budgets, and goals. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <Button variant="destructive" onClick={handleClearAll}>
+                Yes, Clear All Data
+              </Button>
+              <Button variant="outline" onClick={() => setShowConfirm(false)}>
+                No, Go Back
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm text-muted-foreground mb-3">
+              This will delete all your data and restore default categories. This action cannot be undone.
+            </p>
+            <Button variant="destructive" onClick={() => setShowConfirm(true)}>
+              <Trash2 className="h-4 w-4 mr-2" /> Clear All Data
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

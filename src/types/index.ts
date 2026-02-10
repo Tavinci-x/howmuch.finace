@@ -1,5 +1,5 @@
 export type TransactionType = 'income' | 'expense'
-export type TimeRange = 'week' | 'month' | 'year' | 'all'
+export type TimeRange = 'month' | 'year' | 'all'
 
 export interface Transaction {
   id: string

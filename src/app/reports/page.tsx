@@ -5,8 +5,8 @@ import { useLiveQuery } from "dexie-react-hooks"
 import { db } from "@/lib/db"
 import { useDefaultCurrency } from "@/hooks/use-settings"
 import { formatCurrency } from "@/lib/currencies"
-import { getDateRange, getLast6Months } from "@/lib/utils"
-import { format, subMonths, startOfMonth, endOfMonth, differenceInDays } from "date-fns"
+import { getDateRange, getTrendPeriods } from "@/lib/utils"
+import { subMonths, startOfMonth, endOfMonth, differenceInDays } from "date-fns"
 import type { TimeRange } from "@/types"
 import { getIcon } from "@/lib/icons"
 
@@ -48,14 +48,16 @@ export default function ReportsPage() {
     }
     const spendingByCategory = Object.values(spendingMap).sort((a, b) => b.value - a.value)
 
-    // Income vs Expense by month
-    const months = getLast6Months()
-    const incomeVsExpense = months.map(month => {
-      const monthTxns = transactions.filter(t => t.date.startsWith(month))
-      const income = monthTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-      const expenses = monthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-      const [y, m] = month.split('-')
-      return { month: format(new Date(parseInt(y), parseInt(m) - 1), 'MMM'), Income: income, Expenses: expenses }
+    // Income vs Expense trend (time-range aware)
+    const earliestTxn = transactions.length > 0
+      ? transactions.reduce((min, t) => t.date < min ? t.date : min, transactions[0].date)
+      : undefined
+    const periods = getTrendPeriods(timeRange, earliestTxn ? new Date(earliestTxn) : undefined)
+    const incomeVsExpense = periods.map(period => {
+      const periodTxns = transactions.filter(t => t.date.startsWith(period.key))
+      const income = periodTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const expenses = periodTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      return { label: period.label, Income: income, Expenses: expenses }
     })
 
     // Summary stats
@@ -186,7 +188,7 @@ export default function ReportsPage() {
           {/* Income vs Expenses Chart */}
           <div className="space-y-2">
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Monthly Trend
+              {timeRange === 'month' ? 'Monthly' : timeRange === 'year' ? 'Yearly' : 'All-Time'} Trend
             </h2>
             <IncomeVsExpense data={reportData.incomeVsExpense} currency={currency} />
           </div>

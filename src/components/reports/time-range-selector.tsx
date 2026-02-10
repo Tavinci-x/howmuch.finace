@@ -12,7 +12,6 @@ export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
   return (
     <Tabs value={value} onValueChange={(v) => onChange(v as TimeRange)}>
       <TabsList>
-        <TabsTrigger value="week">Week</TabsTrigger>
         <TabsTrigger value="month">Month</TabsTrigger>
         <TabsTrigger value="year">Year</TabsTrigger>
         <TabsTrigger value="all">All Time</TabsTrigger>

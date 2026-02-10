@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns"
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, eachMonthOfInterval, eachDayOfInterval } from "date-fns"
 import type { TimeRange } from "@/types"
 
 export function cn(...inputs: ClassValue[]) {
@@ -27,8 +27,6 @@ export function getCurrentMonth(): string {
 export function getDateRange(range: TimeRange): { start: Date; end: Date } {
   const now = new Date()
   switch (range) {
-    case 'week':
-      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) }
     case 'month':
       return { start: startOfMonth(now), end: endOfMonth(now) }
     case 'year':
@@ -47,4 +45,35 @@ export function getLast6Months(): string[] {
     months.push(format(new Date(currentYear, i, 1), 'yyyy-MM'))
   }
   return months
+}
+
+export function getTrendPeriods(timeRange: TimeRange, earliestDate?: Date): { key: string; label: string }[] {
+  const now = new Date()
+
+  switch (timeRange) {
+    case 'month': {
+      const start = startOfMonth(now)
+      const end = endOfMonth(now)
+      return eachDayOfInterval({ start, end }).map(d => ({
+        key: format(d, 'yyyy-MM-dd'),
+        label: format(d, 'd'),
+      }))
+    }
+    case 'year': {
+      const start = startOfYear(now)
+      const end = endOfYear(now)
+      return eachMonthOfInterval({ start, end }).map(d => ({
+        key: format(d, 'yyyy-MM'),
+        label: format(d, 'MMM'),
+      }))
+    }
+    case 'all': {
+      const start = earliestDate ? startOfMonth(earliestDate) : startOfYear(now)
+      const end = now
+      return eachMonthOfInterval({ start, end }).map(d => ({
+        key: format(d, 'yyyy-MM'),
+        label: format(d, 'MMM yy'),
+      }))
+    }
+  }
 }
