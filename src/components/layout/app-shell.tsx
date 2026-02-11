@@ -33,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }, [loading, user, isOAuthCallback])
 
     useEffect(() => {
-        // Only redirect to /login from protected pages (reports, settings) — NOT from home
+        // Only redirect to /login from protected pages — NOT from home
         if (!loading && !user && !isLoginPage && !isHomePage && !isOAuthCallback) {
             router.push("/login")
         }
@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <LandingHeader />
                     <HeroSection />
                     <main className="flex-1">
-                        <div className="p-4 md:p-6 max-w-3xl mx-auto">
+                        <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-3xl mx-auto">
                             {children}
                         </div>
                     </main>
@@ -82,7 +82,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )
     }
 
-    // Authenticated — full app shell
+    // Authenticated — full app shell with sidebar + mobile nav
     return (
         <DBProvider>
             <div className="flex min-h-screen">
