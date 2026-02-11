@@ -5,6 +5,8 @@ import { useAuth } from "@/components/providers/auth-provider"
 import { DBProvider } from "@/components/providers/db-provider"
 import { Sidebar } from "@/components/layout/sidebar"
 import { MobileNav } from "@/components/layout/mobile-nav"
+import { LandingHeader } from "@/components/layout/landing-header"
+import { HeroSection } from "@/components/layout/hero-section"
 import { useEffect, useState } from "react"
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -14,6 +16,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const [isOAuthCallback, setIsOAuthCallback] = useState(false)
 
     const isLoginPage = pathname === "/login"
+    const isHomePage = pathname === "/"
 
     // Detect OAuth callback (hash fragment with access_token)
     useEffect(() => {
@@ -30,13 +33,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }, [loading, user, isOAuthCallback])
 
     useEffect(() => {
-        if (!loading && !user && !isLoginPage && !isOAuthCallback) {
+        // Only redirect to /login from protected pages (reports, settings) — NOT from home
+        if (!loading && !user && !isLoginPage && !isHomePage && !isOAuthCallback) {
             router.push("/login")
         }
         if (!loading && user && isLoginPage) {
             router.push("/")
         }
-    }, [user, loading, isLoginPage, isOAuthCallback, router])
+    }, [user, loading, isLoginPage, isHomePage, isOAuthCallback, router])
 
     // Show loading spinner while checking auth or processing OAuth callback
     if (loading || isOAuthCallback) {
@@ -52,7 +56,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return <>{children}</>
     }
 
-    // Not authenticated — don't render anything (redirect will happen)
+    // Guest on home page — landing header + hero + dashboard demo
+    if (!user && isHomePage) {
+        return (
+            <DBProvider>
+                <div className="min-h-screen flex flex-col">
+                    <LandingHeader />
+                    <HeroSection />
+                    <main className="flex-1">
+                        <div className="p-4 md:p-6 max-w-3xl mx-auto">
+                            {children}
+                        </div>
+                    </main>
+                </div>
+            </DBProvider>
+        )
+    }
+
+    // Not authenticated on protected page — redirect will happen
     if (!user) {
         return (
             <div className="flex h-screen items-center justify-center">
@@ -76,4 +97,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </DBProvider>
     )
 }
-
