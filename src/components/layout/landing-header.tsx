@@ -8,7 +8,7 @@ export function LandingHeader() {
             <div className="max-w-3xl mx-auto flex h-14 items-center justify-between px-4 md:px-6">
                 <h1 className="text-lg font-bold">HowMuch.Finance</h1>
                 <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                    <span className="text-xs text-muted-foreground">
                         Login to save your data
                     </span>
                     <Link
