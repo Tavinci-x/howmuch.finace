@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/layout/sidebar"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { LandingHeader } from "@/components/layout/landing-header"
 import { HeroSection } from "@/components/layout/hero-section"
+import { Footer } from "@/components/layout/footer"
 import { useEffect, useState } from "react"
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -68,6 +69,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             {children}
                         </div>
                     </main>
+                    <Footer />
                 </div>
             </DBProvider>
         )

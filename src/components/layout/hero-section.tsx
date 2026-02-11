@@ -8,7 +8,7 @@ export function HeroSection() {
                     Track your finances, without the mess.
                 </h2>
                 <p className="text-muted-foreground text-sm md:text-base max-w-md mx-auto">
-                    Add your income and expenses below to try it out — no account needed.
+                    Add your income and expenses below to try it out — for FREE.
                 </p>
             </div>
         </section>
