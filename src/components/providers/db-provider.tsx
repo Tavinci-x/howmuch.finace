@@ -1,14 +1,43 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { seedDatabase } from "@/lib/seed"
+import { useAuth } from "@/components/providers/auth-provider"
+import { initialSync, startBackgroundSync, stopBackgroundSync } from "@/lib/sync"
 
 export function DBProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false)
+  const { user } = useAuth()
+  const syncStarted = useRef(false)
 
   useEffect(() => {
-    seedDatabase().then(() => setReady(true))
-  }, [])
+    async function init() {
+      // Seed default categories
+      await seedDatabase()
+
+      // If logged in, sync with Supabase
+      if (user && !syncStarted.current) {
+        syncStarted.current = true
+        try {
+          await initialSync(user.id)
+          startBackgroundSync(user.id)
+        } catch (error) {
+          console.error('[DBProvider] Sync failed, using local data:', error)
+        }
+      }
+
+      setReady(true)
+    }
+
+    init()
+
+    return () => {
+      if (syncStarted.current) {
+        stopBackgroundSync()
+        syncStarted.current = false
+      }
+    }
+  }, [user])
 
   if (!ready) {
     return (
