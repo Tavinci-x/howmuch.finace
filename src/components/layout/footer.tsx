@@ -2,12 +2,12 @@
 
 export function Footer() {
     return (
-        <footer className="border-t py-6 text-center space-y-1">
+        <footer className="py-6 text-center space-y-1">
             <p className="text-xs text-muted-foreground font-medium">
                 Private. Simple. Yours.
             </p>
             <p className="text-xs text-muted-foreground">
-                Built by{" "}
+                –
                 <a
                     href="https://x.com/Skylab_ai"
                     target="_blank"
@@ -16,7 +16,6 @@ export function Footer() {
                 >
                     Tavinci
                 </a>
-                .
             </p>
         </footer>
     )
