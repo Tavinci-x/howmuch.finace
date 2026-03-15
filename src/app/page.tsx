@@ -203,48 +203,56 @@ export default function DashboardPage() {
                     {group.transactions.length}
                   </span>
                 </div>
-                {/* Transactions for this date */}
-                <div className="border divide-y">
-                  {group.transactions.map((t) => {
-                    const cat = categoryMap.get(t.categoryId)
-                    const Icon = getIcon(cat?.icon || "MoreHorizontal")
-                    return (
-                      <div key={t.id} className="flex items-center gap-3 p-3">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <Icon className="h-5 w-5 shrink-0" style={{ color: cat?.color || "#6b7280" }} />
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium truncate">
+                {/* Transactions table for this date */}
+                <div className="border">
+                  {/* Table header */}
+                  <div className="flex items-center gap-3 px-3 py-2 border-b bg-muted/30">
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide flex-1">Description</span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide w-36 text-left">Category</span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wide w-24 text-right">Amount</span>
+                    <div className="w-8" />
+                  </div>
+                  {/* Table rows */}
+                  <div className="divide-y">
+                    {group.transactions.map((t) => {
+                      const cat = categoryMap.get(t.categoryId)
+                      const Icon = getIcon(cat?.icon || "MoreHorizontal")
+                      return (
+                        <div key={t.id} className="flex items-center gap-3 px-3 py-2.5">
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm mono truncate block">
                               {t.note || cat?.name || "Unknown"}
-                            </div>
-                            <div className="text-xs text-muted-foreground truncate">
-                              {cat?.name || "Uncategorized"}
-                            </div>
+                            </span>
                           </div>
+                          <div className="w-36 flex items-center gap-1.5 shrink-0">
+                            <Icon className="h-4 w-4 shrink-0" style={{ color: cat?.color || "#6b7280" }} />
+                            <span className="text-sm truncate">{cat?.name || "Other"}</span>
+                          </div>
+                          <span className={`mono text-sm font-medium w-24 text-right shrink-0 ${t.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount, currency)}
+                          </span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setEditingTx(t); setFormOpen(true) }}>
+                                <Pencil className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDelete(t.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                        <span className={`mono font-medium text-right shrink-0 ${t.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                          {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount, currency)}
-                        </span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => { setEditingTx(t); setFormOpen(true) }}>
-                              <Pencil className="h-4 w-4 mr-2" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDelete(t.id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             ))}

@@ -10,6 +10,7 @@ import type { Transaction, Category } from "@/types"
 import { categorizeTransaction } from "@/lib/csv-categorize"
 import { formatCurrency } from "@/lib/currencies"
 import { getIcon } from "@/lib/icons"
+import { forceSyncNow } from "@/lib/sync"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -382,6 +383,9 @@ export function CsvImport({ open, onOpenChange }: CsvImportProps) {
       if (newTransactions.length > 0) {
         await db.transactions.bulkAdd(newTransactions)
       }
+
+      // Sync to Supabase immediately so data survives a page refresh
+      forceSyncNow().catch(() => {})
 
       const msg = skipped > 0
         ? `Imported ${newTransactions.length} transactions (${skipped} duplicates skipped)`
