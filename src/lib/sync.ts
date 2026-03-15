@@ -19,21 +19,25 @@ let currentUserId: string | null = null
 
 /**
  * Initial sync on login:
- * - If Supabase has data → download to Dexie (cloud is source of truth)
- * - If Supabase is empty → upload Dexie to Supabase (first time / demo data)
+ * - If local has transactions → upload to cloud (local is source of truth)
+ * - If local is empty AND cloud has data → download from cloud (new device / fresh browser)
+ * - If both empty → nothing to do
  */
 export async function initialSync(userId: string): Promise<void> {
     currentUserId = userId
 
     try {
-        const cloudExists = await hasCloudData(userId)
+        const localTxCount = await db.transactions.count()
 
-        if (cloudExists) {
-            // Download cloud data → replace Dexie
-            await downloadFromCloud(userId)
-        } else {
-            // First-time user: upload local data → Supabase
+        if (localTxCount > 0) {
+            // Local has data — push to cloud so it stays in sync
             await uploadToCloud(userId)
+        } else {
+            // Local is empty — check if cloud has data to restore
+            const cloudExists = await hasCloudData(userId)
+            if (cloudExists) {
+                await downloadFromCloud(userId)
+            }
         }
     } catch (error) {
         console.error('[Sync] Initial sync error:', error)
@@ -42,7 +46,9 @@ export async function initialSync(userId: string): Promise<void> {
 }
 
 /**
- * Download all data from Supabase and populate Dexie
+ * Download all data from Supabase and populate Dexie.
+ * Only replaces tables that have actual cloud data — never wipes local data
+ * to replace it with nothing.
  */
 async function downloadFromCloud(userId: string) {
     const [transactions, categories, budgets, goals, settings] = await Promise.all([
@@ -53,18 +59,27 @@ async function downloadFromCloud(userId: string) {
         fetchCloudSettings(userId),
     ])
 
-    // Replace local data with cloud data
-    await db.transactions.clear()
-    await db.categories.clear()
-    await db.budgets.clear()
-    await db.goals.clear()
-    await db.settings.clear()
-
-    if (transactions.length > 0) await db.transactions.bulkAdd(transactions)
-    if (categories.length > 0) await db.categories.bulkAdd(categories)
-    if (budgets.length > 0) await db.budgets.bulkAdd(budgets)
-    if (goals.length > 0) await db.goals.bulkAdd(goals)
-    if (settings.length > 0) await db.settings.bulkAdd(settings)
+    // Only replace a table if cloud actually has data for it
+    if (transactions.length > 0) {
+        await db.transactions.clear()
+        await db.transactions.bulkAdd(transactions)
+    }
+    if (categories.length > 0) {
+        await db.categories.clear()
+        await db.categories.bulkAdd(categories)
+    }
+    if (budgets.length > 0) {
+        await db.budgets.clear()
+        await db.budgets.bulkAdd(budgets)
+    }
+    if (goals.length > 0) {
+        await db.goals.clear()
+        await db.goals.bulkAdd(goals)
+    }
+    if (settings.length > 0) {
+        await db.settings.clear()
+        await db.settings.bulkAdd(settings)
+    }
 
     console.log('[Sync] Downloaded cloud data to local')
 }

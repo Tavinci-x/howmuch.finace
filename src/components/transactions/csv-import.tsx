@@ -385,7 +385,7 @@ export function CsvImport({ open, onOpenChange }: CsvImportProps) {
       }
 
       // Sync to Supabase immediately so data survives a page refresh
-      forceSyncNow().catch(() => {})
+      await forceSyncNow().catch(() => {})
 
       const msg = skipped > 0
         ? `Imported ${newTransactions.length} transactions (${skipped} duplicates skipped)`
