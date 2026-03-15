@@ -7,6 +7,7 @@ import { db } from "@/lib/db"
 import { useDefaultCurrency } from "@/hooks/use-settings"
 import { useLiveQuery } from "dexie-react-hooks"
 import type { Transaction } from "@/types"
+import { categorizeTransaction } from "@/lib/csv-categorize"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -87,10 +88,6 @@ export function CsvImport({ open, onOpenChange }: CsvImportProps) {
   async function handleImport() {
     if (!categories) return
 
-    const categoryMap = new Map(categories.map(c => [c.name.toLowerCase(), c.id]))
-    const defaultExpenseCatId = categories.find(c => c.name === 'Other' && c.type === 'expense')?.id || ''
-    const defaultIncomeCatId = categories.find(c => c.name === 'Other Income')?.id || ''
-
     const colIndex: Record<string, number> = {}
     Object.entries(mapping).forEach(([idx, field]) => {
       if (field !== 'skip') colIndex[field] = parseInt(idx)
@@ -101,30 +98,27 @@ export function CsvImport({ open, onOpenChange }: CsvImportProps) {
     for (const row of csvData) {
       const dateStr = colIndex.date !== undefined ? row[colIndex.date]?.trim() : ''
       const amountStr = colIndex.amount !== undefined ? row[colIndex.amount]?.trim() : ''
-      const typeStr = colIndex.type !== undefined ? row[colIndex.type]?.trim().toLowerCase() : ''
-      const catStr = colIndex.category !== undefined ? row[colIndex.category]?.trim().toLowerCase() : ''
       const noteStr = colIndex.note !== undefined ? row[colIndex.note]?.trim() : ''
 
       if (!dateStr || !amountStr) continue
 
-      const amount = Math.abs(parseFloat(amountStr.replace(/[^0-9.\-]/g, '')))
-      if (isNaN(amount) || amount === 0) continue
+      // Parse the raw amount (keep sign for income/expense detection)
+      const rawAmount = parseFloat(amountStr.replace(/[^0-9.\-]/g, ''))
+      if (isNaN(rawAmount) || rawAmount === 0) continue
+      const amount = Math.abs(rawAmount)
 
-      // Determine type
-      let type: 'income' | 'expense' = 'expense'
-      if (typeStr.includes('income') || typeStr.includes('credit')) {
-        type = 'income'
-      } else if (parseFloat(amountStr.replace(/[^0-9.\-]/g, '')) > 0 && typeStr === '') {
-        // Positive amounts with no explicit type could be income
-        type = 'expense' // Default to expense; user can adjust
+      // Build description from all non-skip text columns for better matching
+      const descriptionParts: string[] = []
+      if (noteStr) descriptionParts.push(noteStr)
+      // Also grab category column text if present (banks sometimes use it for description)
+      if (colIndex.category !== undefined) {
+        const catText = row[colIndex.category]?.trim()
+        if (catText) descriptionParts.push(catText)
       }
+      const description = descriptionParts.join(' ')
 
-      // Match category
-      let categoryId = type === 'income' ? defaultIncomeCatId : defaultExpenseCatId
-      if (catStr) {
-        const matched = categoryMap.get(catStr)
-        if (matched) categoryId = matched
-      }
+      // Auto-categorize using description keywords + amount sign
+      const { categoryId, type } = categorizeTransaction(description, rawAmount, categories)
 
       // Parse date
       let parsedDate: string
