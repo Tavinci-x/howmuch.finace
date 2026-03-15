@@ -12,7 +12,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'real estate', 'apartment', 'housing',
     // Finnish
     'vuokra', 'asunto oy', 'talvikkipolku',
-    'sirkka-liisa', 'sirkkalisa', 'halonen',
+    'sirkka',
   ],
   'Food & Dining': [
     'grocery', 'groceries', 'restaurant', 'food', 'dining', 'cafe', 'coffee',
