@@ -10,6 +10,8 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Housing': [
     'rent', 'mortgage', 'property', 'landlord', 'lease', 'hoa',
     'real estate', 'apartment', 'housing',
+    // Finnish
+    'vuokra', 'asunto oy', 'talvikkipolku',
   ],
   'Food & Dining': [
     'grocery', 'groceries', 'restaurant', 'food', 'dining', 'cafe', 'coffee',
@@ -20,6 +22,10 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'whole foods', 'safeway', 'target', 'ica', 'coop', 'willys',
     'hemköp', 'netto', 'rema', 'kiwi', 'meny', 'spar',
     'bakery', 'deli', 'butcher', 'supermarket', 'market',
+    // Finnish grocery chains & food
+    'alepa', 'k-market', 'k-citymarket', 'k-supermarket', 's-market',
+    'prisma', 'valio aimo', 'wolt', 'foodora',
+    'espresso house', 'kaffet', 'toastery',
   ],
   'Transport': [
     'uber', 'lyft', 'bolt', 'taxi', 'cab', 'fuel', 'gas station',
@@ -27,6 +33,9 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'parking', 'toll', 'transit', 'metro', 'bus ', 'train', 'railway',
     'airline', 'flight', 'car wash', 'car rental', 'hertz', 'avis',
     'sl ', 'ruter', 'sj ', 'vy ', 'flixbus', 'public transport',
+    // Finnish transport
+    'hsl', 'vr ', 'neste', 'abc ', 'easypark', 'norwegian',
+    'huili', 'paku',
   ],
   'Utilities': [
     'electric', 'electricity', 'power', 'water', 'sewage', 'gas bill',
@@ -34,6 +43,8 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'verizon', 'comcast', 'at&t', 'att ', 't-mobile', 'tmobile',
     'telia', 'telenor', 'tre ', 'tele2', 'vodafone',
     'heating', 'waste', 'garbage', 'trash', 'utility', 'utilities',
+    // Finnish utilities & telecom
+    'elisa', 'dna oyj', 'fortum', 'vantaan energia', 'posti',
   ],
   'Entertainment': [
     'netflix', 'spotify', 'hulu', 'disney', 'hbo', 'amazon prime',
@@ -42,6 +53,8 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'epic games', 'riot', 'blizzard', 'ea ', 'activision',
     'museum', 'zoo', 'amusement', 'bowling', 'arcade', 'ticket',
     'viaplay', 'crunchyroll', 'apple tv',
+    // Finnish entertainment
+    'teatteri', 'paf',
   ],
   'Shopping': [
     'amazon', 'ebay', 'etsy', 'ikea', 'zara', 'h&m', 'hm ',
@@ -50,12 +63,17 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'furniture', 'home depot', 'lowes', 'nordstrom', 'macys',
     'clas ohlson', 'jysk', 'elgiganten', 'mediamarkt', 'webhallen',
     'mall', 'outlet', 'store', 'shop',
+    // Finnish shopping
+    'motonet', 'puuilo', 'vinted', 'temu', 'power ', 'marski',
+    'narikka',
   ],
   'Health': [
     'pharmacy', 'apotek', 'cvs', 'walgreens', 'doctor', 'dr ',
     'hospital', 'clinic', 'medical', 'dental', 'dentist', 'optician',
     'therapy', 'therapist', 'gym', 'fitness', 'crossfit', 'yoga',
-    'vitamin', 'supplement', 'health', 'wellness', 'insurance',
+    'vitamin', 'supplement', 'health', 'wellness',
+    // Finnish health
+    'fitness24seven', 'hyvinvointialue',
   ],
   'Education': [
     'tuition', 'university', 'college', 'school', 'academy',
@@ -65,16 +83,20 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   ],
   'Subscriptions': [
     'subscription', 'recurring', 'membership', 'annual fee', 'monthly fee',
-    'apple.com', 'google storage', 'google one', 'icloud', 'dropbox',
+    'apple.com/bill', 'google storage', 'google one', 'icloud', 'dropbox',
     'microsoft 365', 'office 365', 'adobe', 'creative cloud',
     'notion', 'slack', 'zoom', 'figma', 'github', 'openai', 'chatgpt',
     'patreon', 'substack', 'medium',
+    // Domain / hosting
+    'name-cheap', 'namecheap', 'kamatera',
   ],
 
   // Income categories
   'Salary': [
     'salary', 'payroll', 'wages', 'wage', 'direct deposit', 'pay check',
-    'paycheck', 'employer', 'lön', 'lön ', 'monthly pay',
+    'paycheck', 'employer', 'lön', 'monthly pay',
+    // Finnish
+    'palkka',
   ],
   'Freelance': [
     'freelance', 'invoice', 'consulting', 'contract', 'gig',
