@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { db } from "@/lib/db"
 import { formatCurrency } from "@/lib/currencies"
@@ -18,9 +18,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreVertical, Pencil, Trash2, Upload } from "lucide-react"
+import { MoreVertical, Pencil, Trash2, Upload, ChevronLeft, ChevronRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { format, startOfMonth, endOfMonth } from "date-fns"
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, parse } from "date-fns"
 import type { Category, Transaction } from "@/types"
 
 export default function DashboardPage() {
@@ -30,14 +30,25 @@ export default function DashboardPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [csvOpen, setCsvOpen] = useState(false)
 
+  // Month navigation state
+  const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), "yyyy-MM"))
+  const selectedDate = parse(selectedMonth, "yyyy-MM", new Date())
+  const monthStart = format(startOfMonth(selectedDate), "yyyy-MM-dd")
+  const monthEnd = format(endOfMonth(selectedDate), "yyyy-MM-dd")
+
+  const isCurrentMonth = selectedMonth === format(new Date(), "yyyy-MM")
+
+  function goToPrevMonth() {
+    setSelectedMonth(format(subMonths(selectedDate, 1), "yyyy-MM"))
+  }
+  function goToNextMonth() {
+    setSelectedMonth(format(addMonths(selectedDate, 1), "yyyy-MM"))
+  }
+
   async function handleDelete(id: string) {
     await db.transactions.delete(id)
     toast({ title: "Transaction deleted" })
   }
-
-  const now = new Date()
-  const monthStart = format(startOfMonth(now), "yyyy-MM-dd")
-  const monthEnd = format(endOfMonth(now), "yyyy-MM-dd")
 
   const transactions = useLiveQuery(
     () => db.transactions
@@ -56,20 +67,47 @@ export default function DashboardPage() {
   const expenses = transactions?.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0) ?? 0
   const balance = income - expenses
 
-  // Get recent transactions (last 10)
-  const recentTransactions = transactions?.slice(0, 10) ?? []
+  // Group transactions by date
+  const groupedTransactions = useMemo(() => {
+    if (!transactions || transactions.length === 0) return []
+    const groups: { date: string; transactions: Transaction[] }[] = []
+    let currentDate = ''
+    for (const t of transactions) {
+      if (t.date !== currentDate) {
+        currentDate = t.date
+        groups.push({ date: t.date, transactions: [t] })
+      } else {
+        groups[groups.length - 1].transactions.push(t)
+      }
+    }
+    return groups
+  }, [transactions])
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with month navigation */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold mono">💰 Dashboard</h1>
-          <p className="text-sm text-muted-foreground mono">
-            {format(now, "MMMM yyyy")}
-          </p>
         </div>
         <CurrencySelector />
+      </div>
+
+      {/* Month Navigator */}
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="icon" onClick={goToPrevMonth}>
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <button
+          className="text-lg font-medium mono hover:underline"
+          onClick={() => setSelectedMonth(format(new Date(), "yyyy-MM"))}
+          title="Go to current month"
+        >
+          {format(selectedDate, "MMMM yyyy")}
+        </button>
+        <Button variant="ghost" size="icon" onClick={goToNextMonth} disabled={isCurrentMonth}>
+          <ChevronRight className="h-5 w-5" />
+        </Button>
       </div>
 
       {/* Summary - Receipt Style */}
@@ -133,59 +171,83 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Recent Transactions */}
+      {/* All Transactions — grouped by date */}
       <div className="space-y-2">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          Recent Transactions
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Transactions
+          </h2>
+          {transactions && transactions.length > 0 && (
+            <span className="text-xs text-muted-foreground mono">
+              {transactions.length} total
+            </span>
+          )}
+        </div>
 
-        {recentTransactions.length === 0 ? (
+        {groupedTransactions.length === 0 ? (
           <div className="border border-dashed p-6 text-center text-muted-foreground">
-            <p className="mono">No transactions yet</p>
-            <p className="text-sm mt-1">Add your first transaction above ☝️</p>
+            <p className="mono">No transactions this month</p>
+            <p className="text-sm mt-1">Add a transaction or import a CSV above</p>
           </div>
         ) : (
-          <div className="border divide-y">
-            {recentTransactions.map((t) => {
-              const cat = categoryMap.get(t.categoryId)
-              const Icon = getIcon(cat?.icon || "MoreHorizontal")
-              return (
-                <div key={t.id} className="flex items-center gap-3 p-3">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <Icon className="h-5 w-5 shrink-0" style={{ color: cat?.color || "#6b7280" }} />
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {cat?.name || "Unknown"}
-                      </div>
-                      <div className="text-xs text-muted-foreground mono">
-                        {format(new Date(t.date), "MMM d")}
-                      </div>
-                    </div>
-                  </div>
-                  <span className={`mono font-medium text-right shrink-0 ${t.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount, currency)}
+          <div className="space-y-3">
+            {groupedTransactions.map((group) => (
+              <div key={group.date}>
+                {/* Date header */}
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-medium text-muted-foreground mono">
+                    {format(new Date(group.date + 'T00:00:00'), "EEE, MMM d")}
                   </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => { setEditingTx(t); setFormOpen(true) }}>
-                        <Pencil className="h-4 w-4 mr-2" /> Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDelete(t.id)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground mono">
+                    {group.transactions.length}
+                  </span>
                 </div>
-              )
-            })}
+                {/* Transactions for this date */}
+                <div className="border divide-y">
+                  {group.transactions.map((t) => {
+                    const cat = categoryMap.get(t.categoryId)
+                    const Icon = getIcon(cat?.icon || "MoreHorizontal")
+                    return (
+                      <div key={t.id} className="flex items-center gap-3 p-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Icon className="h-5 w-5 shrink-0" style={{ color: cat?.color || "#6b7280" }} />
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">
+                              {t.note || cat?.name || "Unknown"}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {cat?.name || "Uncategorized"}
+                            </div>
+                          </div>
+                        </div>
+                        <span className={`mono font-medium text-right shrink-0 ${t.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          {t.type === "income" ? "+" : "-"}{formatCurrency(t.amount, currency)}
+                        </span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setEditingTx(t); setFormOpen(true) }}>
+                              <Pencil className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDelete(t.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

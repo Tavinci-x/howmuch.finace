@@ -350,19 +350,43 @@ export function CsvImport({ open, onOpenChange }: CsvImportProps) {
 
     setImporting(true)
     try {
-      const transactions: Transaction[] = previewTransactions.map(pt => ({
-        id: uuidv4(),
-        amount: pt.amount,
-        type: pt.type,
-        categoryId: pt.categoryId,
-        currency: defaultCurrency,
-        date: pt.date,
-        note: pt.note,
-        createdAt: new Date().toISOString(),
-      }))
+      // Build a set of existing transaction fingerprints for duplicate detection
+      const existing = await db.transactions.toArray()
+      const existingKeys = new Set(
+        existing.map(t => `${t.date}|${t.amount}|${t.type}|${t.note}`)
+      )
 
-      await db.transactions.bulkAdd(transactions)
-      toast({ title: `Imported ${transactions.length} transactions` })
+      const newTransactions: Transaction[] = []
+      let skipped = 0
+
+      for (const pt of previewTransactions) {
+        const key = `${pt.date}|${pt.amount}|${pt.type}|${pt.note}`
+        if (existingKeys.has(key)) {
+          skipped++
+          continue
+        }
+        // Also add to set so within-file duplicates are caught
+        existingKeys.add(key)
+        newTransactions.push({
+          id: uuidv4(),
+          amount: pt.amount,
+          type: pt.type,
+          categoryId: pt.categoryId,
+          currency: defaultCurrency,
+          date: pt.date,
+          note: pt.note,
+          createdAt: new Date().toISOString(),
+        })
+      }
+
+      if (newTransactions.length > 0) {
+        await db.transactions.bulkAdd(newTransactions)
+      }
+
+      const msg = skipped > 0
+        ? `Imported ${newTransactions.length} transactions (${skipped} duplicates skipped)`
+        : `Imported ${newTransactions.length} transactions`
+      toast({ title: msg })
       onOpenChange(false)
       resetState()
     } catch {

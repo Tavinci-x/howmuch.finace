@@ -201,6 +201,19 @@ export async function deleteRemovedItems(
     }
 }
 
+// ─── Clear all cloud data for a user ────────────────────────────────
+
+export async function clearAllCloudData(userId: string) {
+    const supabase = createClient()
+    await Promise.all([
+        supabase.from('transactions').delete().eq('user_id', userId),
+        supabase.from('categories').delete().eq('user_id', userId),
+        supabase.from('budgets').delete().eq('user_id', userId),
+        supabase.from('goals').delete().eq('user_id', userId),
+        supabase.from('settings').delete().eq('user_id', userId),
+    ])
+}
+
 // ─── Check if user has cloud data ──────────────────────────────────
 
 export async function hasCloudData(userId: string): Promise<boolean> {

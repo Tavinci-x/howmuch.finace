@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { db } from "@/lib/db"
 import { seedDatabase } from "@/lib/seed"
+import { clearAllCloudData } from "@/lib/supabase-data"
+import { useAuth } from "@/components/providers/auth-provider"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -12,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 
 export function DataManagement() {
   const { toast } = useToast()
+  const { user } = useAuth()
   const [showConfirm, setShowConfirm] = useState(false)
 
   async function handleExport() {
@@ -73,6 +76,15 @@ export function DataManagement() {
   }
 
   async function handleClearAll() {
+    // Clear cloud data first (so sync doesn't restore it)
+    if (user) {
+      try {
+        await clearAllCloudData(user.id)
+      } catch (error) {
+        console.error('[DataManagement] Failed to clear cloud data:', error)
+      }
+    }
+
     await db.transactions.clear()
     await db.categories.clear()
     await db.budgets.clear()
