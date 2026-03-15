@@ -159,9 +159,9 @@ export function categorizeTransaction(
   // No keyword match — use amount sign
   const isIncome = amount > 0
 
-  // Fallback category
+  // Fallback category — salary is the most common income type
   const fallback = isIncome
-    ? catByName.get('Other Income') || catByName.get('Salary')
+    ? catByName.get('Salary') || catByName.get('Other Income')
     : catByName.get('Other') || categories.find(c => c.type === 'expense')
 
   return {

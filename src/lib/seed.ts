@@ -73,13 +73,13 @@ export async function seedDatabase() {
       await db.categories.bulkAdd(allCategories)
     }
 
-    // Set default currency to USD if no settings exist
+    // Set default currency to EUR if no settings exist
     const settingsCount = await db.settings.count()
     if (settingsCount === 0) {
       await db.settings.add({
         id: uuidv4(),
         key: 'defaultCurrency',
-        value: 'USD',
+        value: 'EUR',
       })
     }
   } finally {
