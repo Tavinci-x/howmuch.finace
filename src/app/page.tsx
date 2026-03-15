@@ -10,6 +10,7 @@ import { CurrencySelector } from "@/components/dashboard/currency-selector"
 import { QuickAdd } from "@/components/dashboard/quick-add"
 import { BreakdownDonut } from "@/components/dashboard/expense-donut"
 import { TransactionForm } from "@/components/transactions/transaction-form"
+import { CsvImport } from "@/components/transactions/csv-import"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -17,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreVertical, Pencil, Trash2 } from "lucide-react"
+import { MoreVertical, Pencil, Trash2, Upload } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { format, startOfMonth, endOfMonth } from "date-fns"
 import type { Category, Transaction } from "@/types"
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const { toast } = useToast()
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [csvOpen, setCsvOpen] = useState(false)
 
   async function handleDelete(id: string) {
     await db.transactions.delete(id)
@@ -102,6 +104,20 @@ export default function DashboardPage() {
 
       {/* Quick Add */}
       <QuickAdd />
+
+      {/* CSV Upload */}
+      <div
+        onClick={() => setCsvOpen(true)}
+        className="border-2 border-dashed p-8 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-foreground/40 hover:bg-muted/50 transition-colors"
+      >
+        <Upload className="h-8 w-8 text-muted-foreground" />
+        <div className="text-center">
+          <p className="font-medium mono">Upload your CSV file</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Import transactions from your bank statement
+          </p>
+        </div>
+      </div>
 
       {/* Income and Expenses Breakdown */}
       {transactions && transactions.length > 0 && (
@@ -179,6 +195,8 @@ export default function DashboardPage() {
         onOpenChange={(open) => { setFormOpen(open); if (!open) setEditingTx(null) }}
         transaction={editingTx}
       />
+
+      <CsvImport open={csvOpen} onOpenChange={setCsvOpen} />
     </div>
   )
 }
