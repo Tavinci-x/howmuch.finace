@@ -10,9 +10,12 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Housing': [
     'rent', 'mortgage', 'property', 'landlord', 'lease', 'hoa',
     'real estate', 'apartment', 'housing',
-    // Finnish
-    'vuokra', 'asunto oy', 'talvikkipolku',
-    'sirkka',
+    // Finnish housing companies & rental providers
+    'vuokra', 'asunto oy', 'as oy', 'kiinteistö oy', 'kiinteistö',
+    'sato', 'kojamo', 'lumo', 'avara', 'vvo',
+    'realia', 'newsec',
+    // Personal landlord (user-specific)
+    'sirkka liisa', 'sirkka-liisa', 'sirkkalisa',
   ],
   'Food & Dining': [
     'grocery', 'groceries', 'restaurant', 'food', 'dining', 'cafe', 'coffee',
