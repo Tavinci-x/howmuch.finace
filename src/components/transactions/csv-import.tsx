@@ -176,25 +176,13 @@ function autoDetectMapping(headers: string[]): Record<number, FieldMapping> {
       return
     }
 
-    // Transaction type columns (KORTTIOSTO, PALKKA, TILISIIRTO, etc.)
-    if (
-      lower.includes('type') || lower.includes('direction') ||
-      lower === 'tapahtumalaji' || lower === 'typ' || lower === 'laji'
-    ) {
-      autoMap[i] = 'type'
-      return
-    }
-
-    // Description / merchant / note columns — map as note for keyword matching
+    // Description / merchant name — only the recipient name
     if (
       lower.includes('note') || lower.includes('desc') ||
-      lower.includes('memo') || lower.includes('text') ||
-      lower.includes('narration') || lower.includes('particular') ||
-      lower.includes('reference') || lower.includes('merchant') ||
-      lower.includes('payee') || lower.includes('mottagare') ||
-      lower.includes('meddelande') || lower.includes('namn') ||
-      lower === 'saajan nimi' || lower === 'viesti' ||
-      lower === 'maksaja' || lower === 'selite'
+      lower.includes('memo') || lower.includes('narration') ||
+      lower.includes('merchant') || lower.includes('payee') ||
+      lower.includes('mottagare') || lower.includes('namn') ||
+      lower === 'saajan nimi' || lower === 'selite'
     ) {
       autoMap[i] = 'note'
       return
