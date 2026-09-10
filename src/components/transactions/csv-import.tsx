@@ -53,7 +53,8 @@ export function CsvImport({open,onOpenChange}:CsvImportProps){
       const refreshed=preview.transactions.flatMap(tx=>{
         if(!tx.fingerprint)return[]
         const current=existingByFingerprint.get(tx.fingerprint)
-        if(!current||((current.categorizationConfidence??0)>=1&&tx.normalizedMerchant!=='Own Transfer'))return[]
+        const ruleManaged=tx.normalizedMerchant==='Own Transfer'||tx.normalizedMerchant==='American Express'
+        if(!current||((current.categorizationConfidence??0)>=1&&!ruleManaged))return[]
         return [{...current,categoryId:tx.categoryId,normalizedMerchant:tx.normalizedMerchant,note:tx.note,rawDescription:tx.rawDescription,kind:tx.kind,type:tx.type,excludedFromAnalytics:tx.excludedFromAnalytics,reviewStatus:tx.reviewStatus,categorizationConfidence:tx.categorizationConfidence,updatedAt:new Date().toISOString()}]
       })
       const batch=createImportBatch(preview,account.id,file.name,fresh.length,duplicateCount)

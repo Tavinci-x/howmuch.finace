@@ -140,7 +140,7 @@ export async function parseBankStatement(file:File,account:Account,categories:Ca
     }else if(amexPayment){
       categoryId=categoryNamed(categories,'Amex')?.id||categoryId
       normalizedMerchant='American Express'
-      kind='transfer';excludedFromAnalytics=true;confidence=1
+      kind='purchase';excludedFromAnalytics=false;confidence=1
     }else if(amexReimbursement){
       categoryId=categoryNamed(categories,'Reimbursements')?.id||categoryId
       kind='transfer';excludedFromAnalytics=true;confidence=1
