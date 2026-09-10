@@ -5,9 +5,19 @@ import type { Category } from '@/types'
 const defaultExpenseCategories: Omit<Category, 'id'>[] = [
   { name: 'Housing', icon: 'Home', color: '#3b82f6', type: 'expense', isDefault: true },
   { name: 'Food & Dining', icon: 'UtensilsCrossed', color: '#ef4444', type: 'expense', isDefault: true },
+  { name: 'Groceries', icon: 'ShoppingBag', color: '#16a34a', type: 'expense', isDefault: true },
+  { name: 'Restaurants & Cafés', icon: 'UtensilsCrossed', color: '#f97316', type: 'expense', isDefault: true },
   { name: 'Transport', icon: 'Car', color: '#06b6d4', type: 'expense', isDefault: true },
+  { name: 'Car Payment', icon: 'Car', color: '#0891b2', type: 'expense', isDefault: true },
   { name: 'Utilities', icon: 'Zap', color: '#f59e0b', type: 'expense', isDefault: true },
+  { name: 'Phone & Internet', icon: 'Zap', color: '#0ea5e9', type: 'expense', isDefault: true },
+  { name: 'Insurance', icon: 'Home', color: '#2563eb', type: 'expense', isDefault: true },
   { name: 'Entertainment', icon: 'Gamepad2', color: '#8b5cf6', type: 'expense', isDefault: true },
+  { name: 'Gambling', icon: 'Gamepad2', color: '#dc2626', type: 'expense', isDefault: true },
+  { name: 'Travel', icon: 'Car', color: '#7c3aed', type: 'expense', isDefault: true },
+  { name: 'Taxes & Government', icon: 'Briefcase', color: '#64748b', type: 'expense', isDefault: true },
+  { name: 'Amex', icon: 'CreditCard', color: '#2563eb', type: 'expense', isDefault: true },
+  { name: 'Transfers', icon: 'CreditCard', color: '#94a3b8', type: 'both', isDefault: true },
   { name: 'Shopping', icon: 'ShoppingBag', color: '#ec4899', type: 'expense', isDefault: true },
   { name: 'Health', icon: 'Heart', color: '#f43f5e', type: 'expense', isDefault: true },
   { name: 'Education', icon: 'GraduationCap', color: '#6366f1', type: 'expense', isDefault: true },
@@ -17,6 +27,7 @@ const defaultExpenseCategories: Omit<Category, 'id'>[] = [
 
 const defaultIncomeCategories: Omit<Category, 'id'>[] = [
   { name: 'Salary', icon: 'Briefcase', color: '#22c55e', type: 'income', isDefault: true },
+  { name: 'Reimbursements', icon: 'CreditCard', color: '#059669', type: 'income', isDefault: true },
   { name: 'Freelance', icon: 'Laptop', color: '#10b981', type: 'income', isDefault: true },
   { name: 'Gifts', icon: 'Gift', color: '#a855f7', type: 'income', isDefault: true },
   { name: 'Investments', icon: 'TrendingUp', color: '#f97316', type: 'income', isDefault: true },
@@ -60,18 +71,14 @@ export async function seedDatabase() {
       }
     }
 
-    const categoryCount = await db.categories.count()
-    if (categoryCount === 0) {
-      const allCategories: Category[] = [
-        ...defaultExpenseCategories,
-        ...defaultIncomeCategories,
-      ].map((cat) => ({
-        ...cat,
-        id: uuidv4(),
-      }))
-
-      await db.categories.bulkAdd(allCategories)
-    }
+    // Add newly introduced defaults without duplicating or replacing user categories.
+    const categoryNames = new Set((await db.categories.toArray()).map(category => category.name.toLocaleLowerCase()))
+    const missingCategories: Category[] = [...defaultExpenseCategories, ...defaultIncomeCategories]
+      .filter(category => !categoryNames.has(category.name.toLocaleLowerCase()))
+      .map(category => ({ ...category, id: uuidv4() }))
+    if (missingCategories.length > 0) await db.categories.bulkAdd(missingCategories)
+    const investments = await db.categories.where('name').equals('Investments').first()
+    if (investments && investments.type !== 'both') await db.categories.update(investments.id, { type: 'both' })
 
     // Set default currency to EUR if no settings exist
     const settingsCount = await db.settings.count()

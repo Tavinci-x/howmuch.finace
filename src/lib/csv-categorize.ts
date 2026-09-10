@@ -17,39 +17,52 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     // Personal landlord (user-specific)
     'sirkka liisa', 'sirkka-liisa', 'sirkkalisa',
   ],
-  'Food & Dining': [
-    'grocery', 'groceries', 'restaurant', 'food', 'dining', 'cafe', 'coffee',
-    'uber eats', 'ubereats', 'doordash', 'grubhub', 'deliveroo', 'just eat',
-    'mcdonalds', 'mcdonald', 'burger king', 'starbucks', 'subway', 'pizza',
-    'chipotle', 'taco bell', 'kfc', 'wendy', 'domino', 'panera',
+  'Groceries': [
+    'grocery', 'groceries', 'supermarket', 'market',
     'walmart', 'costco', 'kroger', 'aldi', 'lidl', 'trader joe',
     'whole foods', 'safeway', 'target', 'ica', 'coop', 'willys',
     'hemköp', 'netto', 'rema', 'kiwi', 'meny', 'spar',
-    'bakery', 'deli', 'butcher', 'supermarket', 'market',
-    // Finnish grocery chains & food
+    'bakery', 'deli', 'butcher',
     'alepa', 'k-market', 'k-citymarket', 'k-supermarket', 's-market',
-    'prisma', 'valio aimo', 'wolt', 'foodora',
-    'espresso house', 'kaffet', 'toastery',
+    'prisma', 'valio aimo', 'migros', 'supermercados unide',
   ],
+  'Restaurants & Cafés': [
+    'restaurant', 'food', 'dining', 'cafe', 'coffee',
+    'uber eats', 'ubereats', 'doordash', 'grubhub', 'deliveroo', 'just eat',
+    'mcdonalds', 'mcdonald', 'mcdhelsinki', 'burger king', 'hesburger',
+    'starbucks', 'subway', 'pizza', 'fizza', 'chipotle', 'taco bell',
+    'kfc', 'wendy', 'domino', 'panera', 'wolt', 'foodora',
+    'espresso house', 'kaffet', 'toastery',
+    'kontti grilli', 'marski by scandic fnb', 'pikkulintu', 'ravintola',
+    'ymo gida', 'bi coffee',
+  ],
+  'Car Payment': ['lt autohallinto', 'lt rahoitus'],
   'Transport': [
     'uber', 'lyft', 'bolt', 'taxi', 'cab', 'fuel', 'gas station',
     'petrol', 'diesel', 'shell', 'bp ', 'esso', 'statoil', 'circle k',
     'parking', 'toll', 'transit', 'metro', 'bus ', 'train', 'railway',
     'airline', 'flight', 'car wash', 'car rental', 'hertz', 'avis',
-    'sl ', 'ruter', 'sj ', 'vy ', 'flixbus', 'public transport',
+    'ruter', 'flixbus', 'public transport',
     // Finnish transport
-    'hsl', 'vr ', 'neste', 'abc ', 'easypark', 'norwegian',
-    'huili', 'paku',
+    'hsl', 'vr', 'neste', 'abc', 'easypark', 'aimo park',
+    'huili', 'paku', 'bolt', 'motonet', 'bc motors', 'lampugnano park',
+    'oz btm otomotiv',
   ],
   'Utilities': [
-    'electric', 'electricity', 'power', 'water', 'sewage', 'gas bill',
-    'internet', 'broadband', 'fiber', 'wifi', 'phone bill', 'mobile',
+    'electric', 'electricity', 'water', 'sewage', 'gas bill',
+    'heating', 'waste', 'garbage', 'trash', 'utility', 'utilities',
+    'fortum', 'vantaan energia', 'vantaan energy',
+  ],
+  'Phone & Internet': [
+    'internet', 'broadband', 'fiber', 'wifi', 'phone bill',
     'verizon', 'comcast', 'at&t', 'att ', 't-mobile', 'tmobile',
     'telia', 'telenor', 'tre ', 'tele2', 'vodafone',
-    'heating', 'waste', 'garbage', 'trash', 'utility', 'utilities',
-    // Finnish utilities & telecom
-    'elisa', 'dna oyj', 'fortum', 'vantaan energia', 'posti',
+    'elisa', 'dna oyj',
   ],
+  'Insurance': ['insurance', 'vakuutus', 'vahinkovakuutus', 'pohjola vakuutus'],
+  'Gambling': ['paf', 'casino', 'betting', 'sportsbook'],
+  'Travel': ['norwegian', 'airline', 'flight', 'hotel', 'hostel'],
+  'Taxes & Government': ['verohallinto', 'tullin asiointipalvel', 'customs fee'],
   'Entertainment': [
     'netflix', 'spotify', 'hulu', 'disney', 'hbo', 'amazon prime',
     'youtube', 'twitch', 'cinema', 'movie', 'theater', 'theatre',
@@ -57,8 +70,8 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'epic games', 'riot', 'blizzard', 'ea ', 'activision',
     'museum', 'zoo', 'amusement', 'bowling', 'arcade', 'ticket',
     'viaplay', 'crunchyroll', 'apple tv',
-    // Finnish entertainment
-    'teatteri', 'paf',
+    // Finnish entertainment and leisure
+    'teatteri', 'metsahallitus eraluvat', 'narikka.com', 'liiku ry',
   ],
   'Shopping': [
     'amazon', 'ebay', 'etsy', 'ikea', 'zara', 'h&m', 'hm ',
@@ -68,8 +81,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'clas ohlson', 'jysk', 'elgiganten', 'mediamarkt', 'webhallen',
     'mall', 'outlet', 'store', 'shop',
     // Finnish shopping
-    'motonet', 'puuilo', 'vinted', 'temu', 'power ', 'marski',
-    'narikka',
+    'puuilo', 'vinted', 'temu', 'power jarvenpaa', 'tokmanni',
   ],
   'Health': [
     'pharmacy', 'apotek', 'cvs', 'walgreens', 'doctor', 'dr ',
@@ -136,7 +148,7 @@ export function categorizeTransaction(
   amount: number,
   categories: Category[],
 ): CategorizeResult {
-  const descLower = description.toLowerCase()
+  const descLower = normalizeForMatching(description)
 
   // Build a lookup map: category name -> category id
   const catByName = new Map<string, Category>(
@@ -152,7 +164,7 @@ export function categorizeTransaction(
     if (!cat) continue
 
     for (const keyword of keywords) {
-      if (descLower.includes(keyword)) {
+      if (keywordMatches(descLower, keyword)) {
         return {
           categoryId: cat.id,
           type,
@@ -175,4 +187,25 @@ export function categorizeTransaction(
     type: isIncome ? 'income' : 'expense',
     matched: false,
   }
+}
+
+const prefixBrands = new Set(['alepa', 'lidl', 'mcdhelsinki', 'motonet', 'namecheap', 'hesburger'])
+
+function normalizeForMatching(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^a-z0-9\u00c0-\u024f]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function keywordMatches(normalizedDescription: string, keyword: string): boolean {
+  const normalizedKeyword = normalizeForMatching(keyword)
+  if (!normalizedKeyword) return false
+  const paddedDescription = ` ${normalizedDescription} `
+  if (paddedDescription.includes(` ${normalizedKeyword} `)) return true
+  if (normalizedKeyword.includes(' ')) return false
+  return prefixBrands.has(normalizedKeyword)
+    && normalizedDescription.split(' ').some(token => token.startsWith(normalizedKeyword))
 }

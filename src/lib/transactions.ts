@@ -15,6 +15,10 @@ export function isIncluded(transaction: Transaction): boolean {
   return !transaction.deletedAt && !transaction.excludedFromAnalytics && transaction.kind !== 'transfer'
 }
 
+export function isVisible(transaction: Transaction): boolean {
+  return !transaction.deletedAt
+}
+
 export function normalizeMerchant(value: string): string {
   const cleaned = value
     .normalize('NFKC')

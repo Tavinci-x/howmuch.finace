@@ -21,7 +21,7 @@ import { MoreVertical, Pencil, Trash2, Upload, ChevronLeft, ChevronRight } from 
 import { useToast } from "@/hooks/use-toast"
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, parse } from "date-fns"
 import type { Category, Transaction } from "@/types"
-import { isIncluded, majorAmount, signedMinor } from "@/lib/transactions"
+import { isIncluded, isVisible, majorAmount, signedMinor } from "@/lib/transactions"
 import Link from "next/link"
 
 export default function DashboardPage() {
@@ -31,8 +31,9 @@ export default function DashboardPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [csvOpen, setCsvOpen] = useState(false)
   const accounts = useLiveQuery(() => db.accounts.toArray()) || []
-  const totalBalance = accounts.reduce((sum, account) => sum + (account.currentBalanceMinor || 0), 0) / 100
-  const latestImport = accounts.map(account => account.lastImportDate).filter(Boolean).sort().at(-1)
+  const accountsWithBalance = accounts.filter(account => account.currentBalanceMinor!==undefined&&account.currentBalanceMinor!==null)
+  const totalBalance = accountsWithBalance.reduce((sum, account) => sum + (account.currentBalanceMinor || 0), 0) / 100
+  const latestBalanceAsOf = accountsWithBalance.map(account => account.balanceAsOf).filter((value):value is string=>Boolean(value)).sort().at(-1)
 
   // Month navigation state
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), "yyyy-MM"))
@@ -67,20 +68,21 @@ export default function DashboardPage() {
   const categoryMap = new Map<string, Category>(categories?.map(c => [c.id, c]))
 
   // Calculate totals
-  const visibleTransactions = useMemo(
+  const analyticsTransactions = useMemo(
     () => transactions?.filter(isIncluded) ?? [],
     [transactions]
   )
-  const income = visibleTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + signedMinor(t), 0) / 100
-  const expenses = -visibleTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + signedMinor(t), 0) / 100
+  const ledgerTransactions = useMemo(() => transactions?.filter(isVisible) ?? [], [transactions])
+  const income = analyticsTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + signedMinor(t), 0) / 100
+  const expenses = -analyticsTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + signedMinor(t), 0) / 100
   const balance = income - expenses
 
   // Group transactions by date
   const groupedTransactions = useMemo(() => {
-    if (visibleTransactions.length === 0) return []
+    if (ledgerTransactions.length === 0) return []
     const groups: { date: string; transactions: Transaction[] }[] = []
     let currentDate = ''
-    for (const t of visibleTransactions) {
+    for (const t of ledgerTransactions) {
       if (t.date !== currentDate) {
         currentDate = t.date
         groups.push({ date: t.date, transactions: [t] })
@@ -89,7 +91,7 @@ export default function DashboardPage() {
       }
     }
     return groups
-  }, [visibleTransactions])
+  }, [ledgerTransactions])
 
   return (
     <div className="space-y-6">
@@ -121,8 +123,8 @@ export default function DashboardPage() {
       {/* Summary - Receipt Style */}
       <div className="border p-4 space-y-3">
         <div className="flex justify-between items-end pb-2">
-          <div><span className="text-sm font-medium uppercase tracking-wide">Total balance</span>{latestImport&&<p className="text-xs text-muted-foreground mt-1">Updated {new Date(latestImport).toLocaleDateString()}</p>}</div>
-          <span className="mono text-2xl font-bold">{formatCurrency(totalBalance, currency)}</span>
+          <div><span className="text-sm font-medium uppercase tracking-wide">Total balance</span>{latestBalanceAsOf&&<p className="text-xs text-muted-foreground mt-1">As of {new Date(`${latestBalanceAsOf}T00:00:00`).toLocaleDateString()}</p>}</div>
+          <span className="mono text-2xl font-bold">{accountsWithBalance.length?formatCurrency(totalBalance, currency):'Not set'}</span>
         </div>
         <div className="divider" />
         <div className="flex justify-between items-center">
@@ -171,15 +173,15 @@ export default function DashboardPage() {
       </div>
 
       {/* Income and Expenses Breakdown */}
-      {visibleTransactions.length > 0 && (
+      {analyticsTransactions.length > 0 && (
         <div className="space-y-2">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Income and Expenses Breakdown
           </h2>
           <div className="border p-4 flex gap-4">
-            <BreakdownDonut transactions={visibleTransactions} categoryMap={categoryMap} type="income" />
+            <BreakdownDonut transactions={analyticsTransactions} categoryMap={categoryMap} type="income" />
             <div className="w-px bg-border shrink-0" />
-            <BreakdownDonut transactions={visibleTransactions} categoryMap={categoryMap} type="expense" />
+            <BreakdownDonut transactions={analyticsTransactions} categoryMap={categoryMap} type="expense" />
           </div>
         </div>
       )}
@@ -190,9 +192,9 @@ export default function DashboardPage() {
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Transactions
           </h2>
-          {visibleTransactions.length > 0 && (
+          {ledgerTransactions.length > 0 && (
             <span className="text-xs text-muted-foreground mono">
-              {visibleTransactions.length} total
+              {ledgerTransactions.length} total
             </span>
           )}
         </div>
@@ -241,7 +243,7 @@ export default function DashboardPage() {
                             <Icon className="h-4 w-4 shrink-0" style={{ color: cat?.color || "#6b7280" }} />
                             <span className="text-sm truncate">{cat?.name || "Other"}</span>
                           </div>
-                          <span className={`mono text-sm font-medium w-24 text-right shrink-0 ${t.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          <span className={`mono text-sm font-medium w-24 text-right shrink-0 ${t.kind==='transfer'?'text-muted-foreground':t.type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                             {signedMinor(t) > 0 ? "+" : "-"}{formatCurrency(majorAmount(t), t.currency)}
                           </span>
                           <DropdownMenu>

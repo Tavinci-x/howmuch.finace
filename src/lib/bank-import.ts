@@ -4,7 +4,7 @@ import type { Account, Category, ImportBatch, MerchantRule, Transaction } from '
 import { categorizeTransaction } from '@/lib/csv-categorize'
 import { createFingerprint, FINGERPRINT_VERSION, normalizeMerchant } from '@/lib/transactions'
 
-type Column = 'transactionDate'|'postedDate'|'amount'|'debit'|'credit'|'description'|'reference'|'externalId'|'currency'|'transactionKind'|'message'
+type Column = 'transactionDate'|'postedDate'|'amount'|'debit'|'credit'|'description'|'payer'|'reference'|'externalId'|'currency'|'transactionKind'|'message'
 type Mapping = Partial<Record<Column, number>>
 
 export interface ImportPreview {
@@ -39,6 +39,7 @@ const aliases: Record<Column,string[]> = {
   debit:['debit','debet','withdrawal','outflow','otto'],
   credit:['credit','kredit','deposit','inflow','pano'],
   description:['description','merchant','payee','recipient','note','memo','selite','saajan nimi','mottagare'],
+  payer:['payer','sender','maksaja','betalare'],
   reference:['reference','reference number','viite','referens'],
   externalId:['transaction id','transactionid','event id','tapahtumatunnus','arkistointitunnus','id'],
   currency:['currency','valuutta','valuta'],
@@ -75,6 +76,7 @@ async function rowsFromFile(file:File):Promise<string[][]>{
 function detectSource(fileName:string,headers:string[]):ImportPreview['source'] {const text=`${fileName} ${headers.join(' ')}`.toUpperCase();if(/AMEX|AMERICAN EXPRESS/.test(text))return'American Express';if(/S[- ]?PANKKI|S[- ]?BANK/.test(text)||(['KIRJAUSPÄIVÄ','MAKSUPÄIVÄ','TAPAHTUMALAJI','ARKISTOINTITUNNUS'].every(header=>text.includes(header))))return'S-Pankki';return'Generic statement'}
 function cell(row:string[],index?:number){return index===undefined?'':String(row[index]??'').trim()}
 function applyMerchantRule(raw:string,rules:MerchantRule[]){const upper=raw.normalize('NFKC').toUpperCase().replace(/\s+/g,' ').trim();return [...rules].sort((a,b)=>b.priority-a.priority).find(rule=>rule.matchType==='exact'?upper===rule.pattern.toUpperCase():upper.includes(rule.pattern.toUpperCase()))}
+function categoryNamed(categories:Category[],name:string){return categories.find(category=>category.name.toLocaleLowerCase()===name.toLocaleLowerCase())}
 
 async function linesFromPdf(file:File):Promise<string[]>{
   const [pdfjs,workerModule]=await Promise.all([import('pdfjs-dist'),import('pdfjs-dist/build/pdf.worker.min.mjs?raw')]);const workerUrl=URL.createObjectURL(new Blob([workerModule.default],{type:'text/javascript'}));pdfjs.GlobalWorkerOptions.workerSrc=workerUrl;const document=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const lines:string[]=[]
@@ -91,7 +93,7 @@ async function parseAmexPdf(file:File,account:Account,categories:Category[],rule
   const dueLabelIndex=lines.findIndex(line=>/Eräpäivä\/Förfallodag/i.test(line));const dueLine=dueLabelIndex>=0?lines.slice(dueLabelIndex+1,dueLabelIndex+7).find(line=>/^\d{2}\.\d{2}\.\d{2}$/.test(line.trim())):undefined;const dueDate=dueLine?parseShortDate(dueLine):undefined
   const limitLabelIndex=lines.findIndex(line=>/Yhteenveto\/Summering.*Ostoraja\/Spenderingsgräns/i.test(line));const limitText=limitLabelIndex>=0?lines.slice(limitLabelIndex+1,limitLabelIndex+3).join(' '):'';const spendingLimitMinor=parseMinor(limitText.match(/\d{1,3}(?:,\d{3})+\.\d{2}/)?.[0]||'')??undefined
   const transactions:Transaction[]=[];const rejected:ImportPreview['rejected']=[];const occurrences=new Map<string,number>()
-  lines.forEach((line,rowIndex)=>{const match=line.match(/^(\d{2}\.\d{2}\.\d{2})\s+(\d{2}\.\d{2}\.\d{2})\s+(.+?)\s+(-?\s*[\d.]+,\d{2})$/);if(!match)return;const transactionDate=strictDate(match[1]);const postedDate=strictDate(match[2]);const statementMinor=parseMinor(match[4]);if(!transactionDate||!postedDate||statementMinor===null||statementMinor===0){rejected.push({row:rowIndex+1,reason:'Invalid Amex transaction row'});return}let payee=match[3].replace(/\s+/g,' ').trim();let originalAmountMinor:number|undefined;let originalCurrency:string|undefined;let exchangeRate:number|undefined;const foreign=payee.match(/^(.*?)\s+(-?[\d.,]+)\s+([A-Z]{3})$/);if(foreign){payee=foreign[1].trim();originalCurrency=foreign[3];const decimals=/^(JPY|KRW)$/.test(originalCurrency)?0:2;const statementOriginal=parseMinor(foreign[2],decimals);if(statementOriginal!==null){originalAmountMinor=-statementOriginal;exchangeRate=Math.abs(((-statementMinor)/100)/(originalAmountMinor/(10**decimals)))}}const amountMinor=-statementMinor;const upper=payee.toUpperCase();const payment=/MAKSUSUORITUS|BETALNING,? TACK/.test(upper);const fee=/JÄSENYYSMAKSU|MEDLEMSAVGIFT|SERVICE FEE/.test(upper);const learned=applyMerchantRule(payee,rules);const categorized=categorizeTransaction(payee,amountMinor,categories);const feeCategory=fee?categories.find(item=>/subscription|fee|jäsen/i.test(item.name)):undefined;const categoryId=learned?.categoryId||feeCategory?.id||categorized.categoryId;const normalizedMerchant=learned?.normalizedMerchant||normalizeMerchant(payee);const kind:Transaction['kind']=payment?'transfer':fee?'fee':amountMinor>0?'refund':'purchase';const confidence=payment||fee?1:learned?1:categorized.matched?.8:.35;const duplicateKey=[transactionDate,postedDate,amountMinor,normalizedMerchant].join('|');const occurrence=(occurrences.get(duplicateKey)||0)+1;occurrences.set(duplicateKey,occurrence);const externalTransactionId=`amex|${duplicateKey}|${occurrence}`;const now=new Date().toISOString();transactions.push({id:uuidv4(),amount:Math.abs(amountMinor)/100,amountMinor,type:kind==='refund'?'expense':amountMinor>=0?'income':'expense',categoryId,accountId:account.id,currency:'EUR',date:transactionDate,postedDate,note:normalizedMerchant,rawDescription:payee,normalizedMerchant,kind,externalTransactionId,fingerprint:createFingerprint({accountId:account.id,postedDate,amountMinor,currency:'EUR',rawDescription:payee,externalTransactionId}),fingerprintVersion:FINGERPRINT_VERSION,excludedFromAnalytics:kind==='transfer',reviewStatus:confidence>=.8?'reviewed':'needs_review',categorizationConfidence:confidence,originalAmountMinor,originalCurrency,exchangeRate,createdAt:now,updatedAt:now})})
+  lines.forEach((line,rowIndex)=>{const match=line.match(/^(\d{2}\.\d{2}\.\d{2})\s+(\d{2}\.\d{2}\.\d{2})\s+(.+?)\s+(-?\s*[\d.]+,\d{2})$/);if(!match)return;const transactionDate=strictDate(match[1]);const postedDate=strictDate(match[2]);const statementMinor=parseMinor(match[4]);if(!transactionDate||!postedDate||statementMinor===null||statementMinor===0){rejected.push({row:rowIndex+1,reason:'Invalid Amex transaction row'});return}let payee=match[3].replace(/\s+/g,' ').trim();let originalAmountMinor:number|undefined;let originalCurrency:string|undefined;let exchangeRate:number|undefined;const foreign=payee.match(/^(.*?)\s+(-?[\d.,]+)\s+([A-Z]{3})$/);if(foreign){payee=foreign[1].trim();originalCurrency=foreign[3];const decimals=/^(JPY|KRW)$/.test(originalCurrency)?0:2;const statementOriginal=parseMinor(foreign[2],decimals);if(statementOriginal!==null){originalAmountMinor=-statementOriginal;exchangeRate=Math.abs(((-statementMinor)/100)/(originalAmountMinor/(10**decimals)))}}const amountMinor=-statementMinor;const upper=payee.toUpperCase();const payment=/MAKSUSUORITUS|BETALNING,? TACK/.test(upper);const fee=/JÄSENYYSMAKSU|MEDLEMSAVGIFT|SERVICE FEE/.test(upper);const learned=applyMerchantRule(payee,rules);const categorized=categorizeTransaction(payee,amountMinor,categories);const feeCategory=fee?categories.find(item=>/subscription|fee|jäsen/i.test(item.name)):undefined;const paymentCategory=payment?categoryNamed(categories,'Amex'):undefined;const categoryId=paymentCategory?.id||learned?.categoryId||feeCategory?.id||categorized.categoryId;const normalizedMerchant=payment?'American Express Payment':learned?.normalizedMerchant||normalizeMerchant(payee);const kind:Transaction['kind']=payment?'transfer':fee?'fee':amountMinor>0?'refund':'purchase';const confidence=payment||fee?1:learned?1:categorized.matched?.8:.35;const duplicateKey=[transactionDate,postedDate,amountMinor,normalizedMerchant].join('|');const occurrence=(occurrences.get(duplicateKey)||0)+1;occurrences.set(duplicateKey,occurrence);const externalTransactionId=`amex|${duplicateKey}|${occurrence}`;const now=new Date().toISOString();transactions.push({id:uuidv4(),amount:Math.abs(amountMinor)/100,amountMinor,type:kind==='refund'?'expense':amountMinor>=0?'income':'expense',categoryId,accountId:account.id,currency:'EUR',date:transactionDate,postedDate,note:normalizedMerchant,rawDescription:payee,normalizedMerchant,kind,externalTransactionId,fingerprint:createFingerprint({accountId:account.id,postedDate,amountMinor,currency:'EUR',rawDescription:payee,externalTransactionId}),fingerprintVersion:FINGERPRINT_VERSION,excludedFromAnalytics:kind==='transfer',reviewStatus:confidence>=.8?'reviewed':'needs_review',categorizationConfidence:confidence,originalAmountMinor,originalCurrency,exchangeRate,createdAt:now,updatedAt:now})})
   if(!transactions.length)throw new Error('No American Express transaction rows were found');const transactionChargeTotalMinor=-transactions.filter(item=>item.kind!=='transfer').reduce((sum,item)=>sum+(item.amountMinor||0),0);const newChargesMinor=summaryAmounts[2];const reconciliationDifferenceMinor=newChargesMinor===undefined?undefined:transactionChargeTotalMinor-newChargesMinor;const statement:StatementDetails={currency:'EUR',statementDate,periodStart:period.start,periodEnd:period.end,dueDate,openingBalanceMinor:summaryAmounts[0],paymentsCreditsMinor:summaryAmounts[1],newChargesMinor,closingBalanceMinor:summaryAmounts[3],amountDueMinor:summaryAmounts[4],spendingLimitMinor,transactionChargeTotalMinor,reconciliationDifferenceMinor,reconciled:reconciliationDifferenceMinor===0};return{source:'American Express',fileHash,transactions,rejected,statement}
 }
 
@@ -105,7 +107,64 @@ export async function parseBankStatement(file:File,account:Account,categories:Ca
   const source=detectSource(file.name,headers);const transactions:Transaction[]=[];const rejected:ImportPreview['rejected']=[]
   rows.slice(1).forEach((row,rowIndex)=>{const transactionDate=strictDate(cell(row,mapping.transactionDate??mapping.postedDate));const postedDate=strictDate(cell(row,mapping.postedDate??mapping.transactionDate));if(!transactionDate||!postedDate){rejected.push({row:rowIndex+2,reason:'Invalid date'});return}
     let amountMinor:number|null=null;if(mapping.amount!==undefined)amountMinor=parseMinor(cell(row,mapping.amount));else{const debit=parseMinor(cell(row,mapping.debit));const credit=parseMinor(cell(row,mapping.credit));if(debit!==null&&debit!==0)amountMinor=-Math.abs(debit);else if(credit!==null&&credit!==0)amountMinor=Math.abs(credit)}if(amountMinor===null||amountMinor===0){rejected.push({row:rowIndex+2,reason:'Invalid or zero amount'});return}
-    const payee=cell(row,mapping.description);if(!payee){rejected.push({row:rowIndex+2,reason:'Missing description'});return}const statementKind=cell(row,mapping.transactionKind).toUpperCase();const message=cell(row,mapping.message).replace(/^'|'$/g,'');const rawDescription=[payee,message&&message!=='-'?message:''].filter(Boolean).join(' · ');const externalTransactionId=cell(row,mapping.externalId)||undefined;const currency=(cell(row,mapping.currency)||account.currency).toUpperCase();const learned=applyMerchantRule(payee,rules);const categorized=categorizeTransaction(`${statementKind} ${rawDescription}`,amountMinor,categories);const categoryId=learned?.categoryId||categorized.categoryId;const category=categories.find(item=>item.id===categoryId);let kind:Transaction['kind']=amountMinor>0?(category?.type==='expense'?'refund':'income'):'purchase';if(statementKind.includes('OMA TILISIIRTO'))kind='transfer';else if(/KÄTEISNOSTO|CASH WITHDRAWAL/.test(statementKind))kind='withdrawal';else if(/PALVELUMAKSU|SERVICE FEE/.test(statementKind))kind='fee';const now=new Date().toISOString();const confidence=kind==='transfer'?1:learned?1:categorized.matched?0.8:0.35;const normalizedMerchant=learned?.normalizedMerchant||normalizeMerchant(payee);transactions.push({id:uuidv4(),amount:Math.abs(amountMinor)/100,amountMinor,type:kind==='refund'?'expense':amountMinor>=0?'income':'expense',categoryId,accountId:account.id,currency,date:transactionDate,postedDate,note:normalizedMerchant,rawDescription,normalizedMerchant,kind,externalTransactionId,fingerprint:createFingerprint({accountId:account.id,postedDate,amountMinor,currency,rawDescription,externalTransactionId}),fingerprintVersion:FINGERPRINT_VERSION,excludedFromAnalytics:kind==='transfer',reviewStatus:confidence>=0.8?'reviewed':'needs_review',categorizationConfidence:confidence,createdAt:now,updatedAt:now})
+    const payee=cell(row,mapping.description)
+    const payer=cell(row,mapping.payer)
+    if(!payee&&!payer){rejected.push({row:rowIndex+2,reason:'Missing payer and recipient'});return}
+    const statementKind=cell(row,mapping.transactionKind).toUpperCase()
+    const message=cell(row,mapping.message).replace(/^'|'$/g,'')
+    // Incoming S-Pankki rows name the account owner as recipient. The payer is
+    // the useful merchant/employer name in that direction.
+    const counterparty=amountMinor>0&&payer?payer:payee||payer
+    const rawDescription=[counterparty,message&&message!=='-'?message:''].filter(Boolean).join(' · ')
+    const externalTransactionId=cell(row,mapping.externalId)||undefined
+    const currency=(cell(row,mapping.currency)||account.currency).toUpperCase()
+    const learned=applyMerchantRule(counterparty,rules)
+    const categorized=categorizeTransaction(`${statementKind} ${rawDescription}`,amountMinor,categories)
+    let categoryId=learned?.categoryId||categorized.categoryId
+    let normalizedMerchant=learned?.normalizedMerchant||normalizeMerchant(counterparty)
+    let kind:Transaction['kind']=amountMinor>0?'income':'purchase'
+    let excludedFromAnalytics=false
+    let confidence=learned?1:categorized.matched?0.8:0.35
+
+    const ownTransfer=statementKind.includes('OMA TILISIIRTO')
+    const amexPayment=amountMinor<0&&/\bAMERICAN EXPRESS\b/i.test(counterparty)
+    const amexReimbursement=amountMinor>0&&/\bAMEX\s+MAKSU\b/i.test(message)
+    const salary=amountMinor>0&&(/PALKKA/.test(statementKind)||/\bPALKKA\b/i.test(message))
+    const carPayment=/\bLT (?:AUTOHALLINTO|RAHOITUS)\b/i.test(counterparty)
+    const investmentTransfer=/\bPAYMONADE\b/i.test(counterparty)
+
+    if(ownTransfer){
+      categoryId=categoryNamed(categories,'Transfers')?.id||categoryId
+      normalizedMerchant='Own Transfer'
+      kind='transfer';excludedFromAnalytics=true;confidence=1
+    }else if(amexPayment){
+      categoryId=categoryNamed(categories,'Amex')?.id||categoryId
+      normalizedMerchant='American Express'
+      kind='transfer';excludedFromAnalytics=true;confidence=1
+    }else if(amexReimbursement){
+      categoryId=categoryNamed(categories,'Reimbursements')?.id||categoryId
+      kind='transfer';excludedFromAnalytics=true;confidence=1
+    }else if(salary){
+      categoryId=categoryNamed(categories,'Salary')?.id||categoryId
+      kind='income';confidence=1
+    }else if(carPayment){
+      categoryId=categoryNamed(categories,'Car Payment')?.id||categoryId
+      normalizedMerchant='LT Rahoitus'
+      kind='purchase';confidence=1
+    }else if(investmentTransfer){
+      categoryId=categoryNamed(categories,'Investments')?.id||categoryId
+      kind='transfer';excludedFromAnalytics=true;confidence=1
+    }else if(/KÄTEISNOSTO|CASH WITHDRAWAL/.test(statementKind)){
+      kind='withdrawal'
+    }else if(/PALVELUMAKSU|SERVICE FEE/.test(statementKind)){
+      kind='fee'
+    }else{
+      const category=categories.find(item=>item.id===categoryId)
+      if(amountMinor>0&&category?.type==='expense')kind='refund'
+    }
+
+    const now=new Date().toISOString()
+    transactions.push({id:uuidv4(),amount:Math.abs(amountMinor)/100,amountMinor,type:kind==='refund'?'expense':amountMinor>=0?'income':'expense',categoryId,accountId:account.id,currency,date:transactionDate,postedDate,note:normalizedMerchant,rawDescription,normalizedMerchant,kind,externalTransactionId,fingerprint:createFingerprint({accountId:account.id,postedDate,amountMinor,currency,rawDescription,externalTransactionId}),fingerprintVersion:FINGERPRINT_VERSION,excludedFromAnalytics,reviewStatus:confidence>=0.8?'reviewed':'needs_review',categorizationConfidence:confidence,createdAt:now,updatedAt:now})
   });return{source,fileHash,transactions,rejected}
 }
 

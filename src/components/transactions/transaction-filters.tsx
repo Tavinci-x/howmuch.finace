@@ -21,6 +21,8 @@ interface TransactionFiltersProps {
   onCategoryFilterChange: (value: string) => void
   accountFilter: string
   onAccountFilterChange: (value: string) => void
+  reviewFilter: string
+  onReviewFilterChange: (value: string) => void
 }
 
 export function TransactionFilters({
@@ -32,6 +34,8 @@ export function TransactionFilters({
   onCategoryFilterChange,
   accountFilter,
   onAccountFilterChange,
+  reviewFilter,
+  onReviewFilterChange,
 }: TransactionFiltersProps) {
   const categories = useLiveQuery(() => db.categories.toArray())
   const accounts = useLiveQuery(() => db.accounts.toArray())
@@ -55,7 +59,12 @@ export function TransactionFilters({
           <SelectItem value="all">All Types</SelectItem>
           <SelectItem value="income">Income</SelectItem>
           <SelectItem value="expense">Expense</SelectItem>
+          <SelectItem value="transfer">Transfers</SelectItem>
         </SelectContent>
+      </Select>
+      <Select value={reviewFilter} onValueChange={onReviewFilterChange}>
+        <SelectTrigger className="w-full sm:w-[170px]"><SelectValue placeholder="Review" /></SelectTrigger>
+        <SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="needs_review">Needs review</SelectItem><SelectItem value="reviewed">Reviewed</SelectItem></SelectContent>
       </Select>
       <Select value={categoryFilter} onValueChange={onCategoryFilterChange}>
         <SelectTrigger className="w-full sm:w-[180px]">

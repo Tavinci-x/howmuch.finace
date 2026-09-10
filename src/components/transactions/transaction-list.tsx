@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreVertical, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { isIncluded, majorAmount, signedMinor } from "@/lib/transactions"
+import { isVisible, majorAmount, signedMinor } from "@/lib/transactions"
 
 export function TransactionList() {
   const { toast } = useToast()
@@ -27,6 +27,7 @@ export function TransactionList() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [accountFilter, setAccountFilter] = useState("all")
+  const [reviewFilter, setReviewFilter] = useState("all")
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formOpen, setFormOpen] = useState(false)
 
@@ -36,7 +37,7 @@ export function TransactionList() {
     const categoryMap = new Map(categories.map(c => [c.id, c]))
     const accountMap = new Map(accounts.map(a => [a.id, a]))
 
-    return transactions.filter(isIncluded).map(t => ({
+    return transactions.filter(isVisible).map(t => ({
       ...t,
       category: categoryMap.get(t.categoryId),
       account: accountMap.get(t.accountId || 'manual'),
@@ -44,7 +45,9 @@ export function TransactionList() {
   })
 
   const filtered = data?.filter(t => {
-    if (typeFilter !== "all" && t.type !== typeFilter) return false
+    if (typeFilter === "transfer" && t.kind !== "transfer") return false
+    if (typeFilter !== "all" && typeFilter !== "transfer" && t.type !== typeFilter) return false
+    if (reviewFilter !== "all" && t.reviewStatus !== reviewFilter) return false
     if (categoryFilter !== "all" && t.categoryId !== categoryFilter) return false
     if (accountFilter !== "all" && t.accountId !== accountFilter) return false
     if (search) {
@@ -74,6 +77,8 @@ export function TransactionList() {
         onCategoryFilterChange={setCategoryFilter}
         accountFilter={accountFilter}
         onAccountFilterChange={setAccountFilter}
+        reviewFilter={reviewFilter}
+        onReviewFilterChange={setReviewFilter}
       />
 
       {!filtered || filtered.length === 0 ? (
@@ -106,6 +111,7 @@ export function TransactionList() {
                     <Badge variant={signedMinor(t) > 0 ? 'default' : 'secondary'} className="text-xs">
                       {t.kind || t.type}
                     </Badge>
+                    {t.reviewStatus==='needs_review'&&<Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">Needs review</Badge>}
                   </div>
                   <div className="text-xs text-muted-foreground flex gap-2">
                     <span>{formatDate(t.date)}</span>

@@ -27,8 +27,8 @@ export function BreakdownDonut({ transactions, categoryMap, type }: BreakdownDon
     }
 
     const preferredOrder = type === 'expense'
-        ? ['Housing', 'Food & Dining', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Education', 'Subscriptions', 'Other']
-        : ['Salary', 'Freelance', 'Gifts', 'Investments', 'Other Income']
+        ? ['Housing', 'Groceries', 'Restaurants & Cafés', 'Car Payment', 'Transport', 'Utilities', 'Phone & Internet', 'Insurance', 'Entertainment', 'Gambling', 'Travel', 'Taxes & Government', 'Shopping', 'Health', 'Education', 'Subscriptions', 'Other']
+        : ['Salary', 'Reimbursements', 'Freelance', 'Gifts', 'Investments', 'Other Income']
 
     const data = Object.values(byCategory).sort((a, b) => {
         const aName = a.name.replace(/^[^\w]*/, '')

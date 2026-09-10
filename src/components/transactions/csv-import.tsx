@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast"
 
 interface CsvImportProps { open:boolean; onOpenChange:(open:boolean)=>void }
-type Result={source:string;found:number;added:number;duplicates:number;rejected:number;categorized:number}
+type Result={source:string;found:number;added:number;updated:number;duplicates:number;rejected:number;categorized:number}
 
 export function CsvImport({open,onOpenChange}:CsvImportProps){
   const {toast}=useToast()
@@ -44,21 +44,31 @@ export function CsvImport({open,onOpenChange}:CsvImportProps){
     setBusy(true)
     try{
       const existing=await db.transactions.where('accountId').equals(account.id).toArray()
-      const fingerprints=new Set(existing.map(tx=>tx.fingerprint).filter((value):value is string=>Boolean(value)))
+      const existingByFingerprint=new Map(existing.filter(tx=>tx.fingerprint).map(tx=>[tx.fingerprint as string,tx]))
+      const fingerprints=new Set(existingByFingerprint.keys())
       const fresh=preview.transactions.filter(tx=>{if(!tx.fingerprint||fingerprints.has(tx.fingerprint))return false;fingerprints.add(tx.fingerprint);return true})
       const duplicateCount=preview.transactions.length-fresh.length
+      // Re-importing a statement refreshes auto-categorized duplicates with the
+      // newest rules, while preserving anything the user manually reviewed.
+      const refreshed=preview.transactions.flatMap(tx=>{
+        if(!tx.fingerprint)return[]
+        const current=existingByFingerprint.get(tx.fingerprint)
+        if(!current||((current.categorizationConfidence??0)>=1&&tx.normalizedMerchant!=='Own Transfer'))return[]
+        return [{...current,categoryId:tx.categoryId,normalizedMerchant:tx.normalizedMerchant,note:tx.note,rawDescription:tx.rawDescription,kind:tx.kind,type:tx.type,excludedFromAnalytics:tx.excludedFromAnalytics,reviewStatus:tx.reviewStatus,categorizationConfidence:tx.categorizationConfidence,updatedAt:new Date().toISOString()}]
+      })
       const batch=createImportBatch(preview,account.id,file.name,fresh.length,duplicateCount)
       const prepared=fresh.map(tx=>({...tx,importId:batch.id}))
       const statementBalance=preview.statement?.closingBalanceMinor
       const balanceUpdate=account.type==='credit_card'&&statementBalance!==undefined?{currentBalanceMinor:-statementBalance,balanceAsOf:preview.statement?.statementDate||preview.statement?.periodEnd}:{}
       await db.transaction('rw',db.transactions,db.imports,db.accounts,async()=>{
         if(prepared.length)await db.transactions.bulkAdd(prepared)
+        if(refreshed.length)await db.transactions.bulkPut(refreshed)
         await db.imports.add(batch)
         await db.accounts.update(account.id,{...balanceUpdate,lastImportDate:new Date().toISOString(),updatedAt:new Date().toISOString()})
       })
       await forceSyncNow().catch(()=>{})
-      setResult({source:preview.source,found:preview.transactions.length+preview.rejected.length,added:fresh.length,duplicates:duplicateCount,rejected:preview.rejected.length,categorized:fresh.filter(tx=>tx.categorizationConfidence&&tx.categorizationConfidence>=.8).length})
-      toast({title:`Imported ${fresh.length} transactions`})
+      setResult({source:preview.source,found:preview.transactions.length+preview.rejected.length,added:fresh.length,updated:refreshed.length,duplicates:duplicateCount,rejected:preview.rejected.length,categorized:preview.transactions.filter(tx=>tx.categorizationConfidence&&tx.categorizationConfidence>=.8).length})
+      toast({title:`Imported ${fresh.length} new and refreshed ${refreshed.length}`})
     }catch{setError('Nothing was changed. Check the file and try again.')}
     finally{setBusy(false)}
   }
@@ -77,12 +87,13 @@ export function CsvImport({open,onOpenChange}:CsvImportProps){
         <div className="border p-4 flex items-center gap-3"><FileSpreadsheet className="h-7 w-7"/><div><p className="font-medium">Detected: {preview.source}</p><p className="text-xs text-muted-foreground mt-1">{file?.name} · {account?.name}</p></div></div>
         {preview.statement&&<div className="border p-4 space-y-3"><div className="flex items-center justify-between"><p className="text-xs uppercase tracking-wide text-muted-foreground">Statement summary</p><span className={`text-xs mono ${preview.statement.reconciled?'text-green-600':'text-amber-600'}`}>{preview.statement.reconciled?'✓ Reconciled':'Needs reconciliation'}</span></div><div className="grid grid-cols-2 sm:grid-cols-4 gap-3"><StatementStat label="Period" value={`${preview.statement.periodStart||'—'} – ${preview.statement.periodEnd||'—'}`}/><StatementStat label="Due date" value={preview.statement.dueDate||'—'}/><StatementStat label="New charges" value={preview.statement.newChargesMinor===undefined?'—':formatCurrency(preview.statement.newChargesMinor/100,preview.statement.currency)}/><StatementStat label="Amount due" value={preview.statement.amountDueMinor===undefined?'—':formatCurrency(preview.statement.amountDueMinor/100,preview.statement.currency)}/></div></div>}
         <div className="grid grid-cols-3 border divide-x"><Stat label="Valid" value={preview.transactions.length}/><Stat label="Needs review" value={preview.transactions.filter(tx=>tx.reviewStatus==='needs_review').length}/><Stat label="Rejected" value={preview.rejected.length}/></div>
-        <div className="border divide-y max-h-72 overflow-y-auto">{preview.transactions.slice(0,30).map(tx=><div key={tx.id} className="flex justify-between gap-4 p-3 text-sm"><div className="min-w-0"><p className="truncate">{tx.normalizedMerchant}</p><p className="text-xs text-muted-foreground">{tx.postedDate} · {categories.find(c=>c.id===tx.categoryId)?.name||'Needs review'}{tx.originalCurrency?` · ${tx.originalCurrency}`:''}</p></div><p className={`mono shrink-0 ${tx.amountMinor&&tx.amountMinor>0?'text-green-600 dark:text-green-400':'text-red-600 dark:text-red-400'}`}>{tx.amountMinor&&tx.amountMinor>0?'+':'−'}{formatCurrency(Math.abs(tx.amountMinor||0)/100,tx.currency)}</p></div>)}</div>
+        <p className="text-xs text-muted-foreground">“Needs review” means no reliable merchant rule was found. Import them safely, then open Transactions and use the Needs review filter to confirm or correct them.</p>
+        <div className="border divide-y max-h-72 overflow-y-auto">{[...preview.transactions].sort((a,b)=>Number(a.reviewStatus!=='needs_review')-Number(b.reviewStatus!=='needs_review')).slice(0,30).map(tx=><div key={tx.id} className="flex justify-between gap-4 p-3 text-sm"><div className="min-w-0"><p className="truncate">{tx.normalizedMerchant}</p><p className="text-xs text-muted-foreground">{tx.postedDate} · {categories.find(c=>c.id===tx.categoryId)?.name||'Other'}{tx.reviewStatus==='needs_review'?' · Needs review':''}{tx.originalCurrency?` · ${tx.originalCurrency}`:''}</p></div><p className={`mono shrink-0 ${tx.amountMinor&&tx.amountMinor>0?'text-green-600 dark:text-green-400':'text-red-600 dark:text-red-400'}`}>{tx.amountMinor&&tx.amountMinor>0?'+':'−'}{formatCurrency(Math.abs(tx.amountMinor||0)/100,tx.currency)}</p></div>)}</div>
         {preview.rejected.length>0&&<p className="text-xs text-muted-foreground">{preview.rejected.length} malformed row{preview.rejected.length===1?' was':'s were'} excluded. No partial or invalid values will be imported.</p>}
         <div className="flex justify-between"><Button variant="outline" onClick={()=>setPreview(null)}>Choose another file</Button><Button onClick={()=>void commit()} disabled={busy||preview.transactions.length===0}>{busy?'Importing…':`Import ${preview.transactions.length}`}</Button></div>
         {error&&<ErrorMessage message={error}/>}
       </div>}
-      {result&&<div className="space-y-5"><div className="border p-5 flex items-center gap-4"><CheckCircle2 className="h-9 w-9 text-green-600"/><div><p className="font-medium">Import complete</p><p className="text-xs text-muted-foreground mt-1">Detected: {result.source}</p></div></div><div className="grid grid-cols-2 sm:grid-cols-5 border divide-x"><Stat label="Found" value={result.found}/><Stat label="New" value={result.added}/><Stat label="Duplicates" value={result.duplicates}/><Stat label="Categorized" value={result.categorized}/><Stat label="Rejected" value={result.rejected}/></div><Button className="w-full" onClick={()=>onOpenChange(false)}>Done</Button></div>}
+      {result&&<div className="space-y-5"><div className="border p-5 flex items-center gap-4"><CheckCircle2 className="h-9 w-9 text-green-600"/><div><p className="font-medium">Import complete</p><p className="text-xs text-muted-foreground mt-1">Detected: {result.source}</p></div></div><div className="grid grid-cols-2 sm:grid-cols-6 border divide-x"><Stat label="Found" value={result.found}/><Stat label="New" value={result.added}/><Stat label="Refreshed" value={result.updated}/><Stat label="Duplicates" value={result.duplicates}/><Stat label="Categorized" value={result.categorized}/><Stat label="Rejected" value={result.rejected}/></div><Button className="w-full" onClick={()=>onOpenChange(false)}>Done</Button></div>}
     </DialogContent>
   </Dialog>
 }

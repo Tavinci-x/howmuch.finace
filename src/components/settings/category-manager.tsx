@@ -97,8 +97,8 @@ export function CategoryManager() {
     toast({ title: "Category deleted" })
   }
 
-  const expenseOrder = ['Housing', 'Food & Dining', 'Transport', 'Utilities', 'Entertainment', 'Shopping', 'Health', 'Education', 'Subscriptions', 'Other']
-  const incomeOrder = ['Salary', 'Freelance', 'Gifts', 'Investments', 'Other Income']
+  const expenseOrder = ['Housing', 'Groceries', 'Restaurants & Cafés', 'Car Payment', 'Transport', 'Utilities', 'Phone & Internet', 'Insurance', 'Entertainment', 'Gambling', 'Travel', 'Taxes & Government', 'Amex', 'Shopping', 'Health', 'Education', 'Subscriptions', 'Other']
+  const incomeOrder = ['Salary', 'Reimbursements', 'Freelance', 'Gifts', 'Investments', 'Other Income']
 
   function sortByPreferred(cats: Category[], order: string[]) {
     return [...cats].sort((a, b) => {
