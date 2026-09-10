@@ -19,6 +19,8 @@ interface TransactionFiltersProps {
   onTypeFilterChange: (value: string) => void
   categoryFilter: string
   onCategoryFilterChange: (value: string) => void
+  accountFilter: string
+  onAccountFilterChange: (value: string) => void
 }
 
 export function TransactionFilters({
@@ -28,8 +30,11 @@ export function TransactionFilters({
   onTypeFilterChange,
   categoryFilter,
   onCategoryFilterChange,
+  accountFilter,
+  onAccountFilterChange,
 }: TransactionFiltersProps) {
   const categories = useLiveQuery(() => db.categories.toArray())
+  const accounts = useLiveQuery(() => db.accounts.toArray())
 
   return (
     <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -64,6 +69,10 @@ export function TransactionFilters({
             </SelectItem>
           ))}
         </SelectContent>
+      </Select>
+      <Select value={accountFilter} onValueChange={onAccountFilterChange}>
+        <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Account" /></SelectTrigger>
+        <SelectContent><SelectItem value="all">All Accounts</SelectItem>{accounts?.map(account=><SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>)}</SelectContent>
       </Select>
     </div>
   )

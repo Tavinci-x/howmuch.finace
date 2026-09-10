@@ -44,6 +44,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
+import { createFingerprint, FINGERPRINT_VERSION, normalizeMerchant } from "@/lib/transactions"
 
 const formSchema = z.object({
   amount: z.number().positive("Amount must be positive"),
@@ -51,6 +52,8 @@ const formSchema = z.object({
   categoryId: z.string().min(1, "Select a category"),
   date: z.date(),
   note: z.string().optional(),
+  kind: z.enum(['purchase','income','refund','transfer','fee','withdrawal','adjustment']),
+  excludedFromAnalytics: z.boolean(),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -75,6 +78,8 @@ export function TransactionForm({ open, onOpenChange, transaction }: Transaction
       categoryId: transaction?.categoryId || "",
       date: transaction ? new Date(transaction.date) : new Date(),
       note: transaction?.note || "",
+      kind: transaction?.kind || (transaction?.type === 'income' ? 'income' : 'purchase'),
+      excludedFromAnalytics: transaction?.excludedFromAnalytics || false,
     },
   })
 
@@ -86,6 +91,8 @@ export function TransactionForm({ open, onOpenChange, transaction }: Transaction
         categoryId: transaction?.categoryId || "",
         date: transaction ? new Date(transaction.date) : new Date(),
         note: transaction?.note || "",
+        kind: transaction?.kind || (transaction?.type === 'income' ? 'income' : 'purchase'),
+        excludedFromAnalytics: transaction?.excludedFromAnalytics || false,
       })
       setType(transaction?.type || "expense")
     }
@@ -96,19 +103,44 @@ export function TransactionForm({ open, onOpenChange, transaction }: Transaction
   ) || []
 
   async function onSubmit(data: FormData) {
+    const amountMinor = Math.round(data.amount * 100) * (data.type === 'income' || data.kind === 'refund' ? 1 : -1)
+    const now = new Date().toISOString()
+    const date = format(data.date, "yyyy-MM-dd")
+    const accountId = transaction?.accountId || 'manual'
+    const currency = transaction?.currency || defaultCurrency
+    const rawDescription = transaction?.rawDescription || data.note || ''
     const record: Transaction = {
       id: transaction?.id || uuidv4(),
       amount: data.amount,
+      amountMinor,
       type: data.type,
       categoryId: data.categoryId,
-      currency: defaultCurrency,
-      date: format(data.date, "yyyy-MM-dd"),
+      accountId,
+      currency,
+      date,
+      postedDate: transaction?.postedDate || date,
       note: data.note || "",
+      rawDescription,
+      normalizedMerchant: transaction?.normalizedMerchant || normalizeMerchant(data.note || 'Manual entry'),
+      kind: data.kind,
+      excludedFromAnalytics: data.excludedFromAnalytics,
+      reviewStatus: 'reviewed',
+      categorizationConfidence: 1,
+      fingerprint: createFingerprint({accountId,postedDate:transaction?.postedDate||date,amountMinor,currency,rawDescription,externalTransactionId:transaction?.externalTransactionId}),
+      fingerprintVersion: FINGERPRINT_VERSION,
       createdAt: transaction?.createdAt || new Date().toISOString(),
+      updatedAt: now,
     }
 
     if (transaction) {
       await db.transactions.update(transaction.id, record)
+      if (record.rawDescription && record.normalizedMerchant && transaction.categoryId !== data.categoryId) {
+        const pattern = record.normalizedMerchant.toUpperCase()
+        const existing = await db.merchantRules.where('pattern').equals(pattern).first()
+        const rule = { pattern, normalizedMerchant:record.normalizedMerchant, categoryId:data.categoryId, matchType:'exact' as const, priority:100, learned:true, updatedAt:now }
+        if (existing) await db.merchantRules.update(existing.id,rule)
+        else await db.merchantRules.add({id:uuidv4(),createdAt:now,...rule})
+      }
       toast({ title: "Transaction updated" })
     } else {
       await db.transactions.add(record)
@@ -260,6 +292,10 @@ export function TransactionForm({ open, onOpenChange, transaction }: Transaction
                 </FormItem>
               )}
             />
+
+            <FormField control={form.control} name="kind" render={({field})=><FormItem><FormLabel>Treatment</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl><SelectContent><SelectItem value="purchase">Purchase</SelectItem><SelectItem value="income">Income</SelectItem><SelectItem value="refund">Refund</SelectItem><SelectItem value="transfer">Transfer between my accounts</SelectItem><SelectItem value="fee">Fee</SelectItem><SelectItem value="withdrawal">Cash withdrawal</SelectItem><SelectItem value="adjustment">Adjustment</SelectItem></SelectContent></Select></FormItem>}/>
+
+            <FormField control={form.control} name="excludedFromAnalytics" render={({field})=><FormItem><label className="flex items-center justify-between border p-3"><span><span className="block text-sm font-medium">Exclude from analytics</span><span className="block text-xs text-muted-foreground mt-1">Keep it in the ledger without changing reports</span></span><input type="checkbox" checked={field.value} onChange={event=>field.onChange(event.target.checked)} className="h-4 w-4"/></label></FormItem>}/>
 
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

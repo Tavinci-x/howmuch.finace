@@ -15,6 +15,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const router = useRouter()
     const { user, loading } = useAuth()
     const [isOAuthCallback, setIsOAuthCallback] = useState(false)
+    const cloudConfigured = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
 
     const isLoginPage = pathname === "/login"
     const isHomePage = pathname === "/"
@@ -35,16 +36,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         // Only redirect to /login from protected pages — NOT from home
-        if (!loading && !user && !isLoginPage && !isHomePage && !isOAuthCallback) {
+        if (cloudConfigured && !loading && !user && !isLoginPage && !isHomePage && !isOAuthCallback) {
             router.push("/login")
         }
-        if (!loading && user && isLoginPage) {
+        if (cloudConfigured && !loading && user && isLoginPage) {
             router.push("/")
         }
-    }, [user, loading, isLoginPage, isHomePage, isOAuthCallback, router])
+    }, [cloudConfigured, user, loading, isLoginPage, isHomePage, isOAuthCallback, router])
 
     // Show loading spinner while checking auth or processing OAuth callback
-    if (loading || isOAuthCallback) {
+    if (cloudConfigured && (loading || isOAuthCallback)) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <div className="text-muted-foreground">Loading...</div>
@@ -58,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     // Guest on home page — landing header + hero + dashboard demo
-    if (!user && isHomePage) {
+    if (cloudConfigured && !user && isHomePage) {
         return (
             <DBProvider>
                 <div className="min-h-screen flex flex-col">
@@ -76,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     // Not authenticated on protected page — redirect will happen
-    if (!user) {
+    if (cloudConfigured && !user) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <div className="text-muted-foreground">Redirecting...</div>

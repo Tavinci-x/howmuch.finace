@@ -3,6 +3,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
 import { getIcon } from "@/lib/icons"
 import type { Category, Transaction, TransactionType } from "@/types"
+import { signedMinor } from "@/lib/transactions"
 
 interface BreakdownDonutProps {
     transactions: Transaction[]
@@ -22,7 +23,7 @@ export function BreakdownDonut({ transactions, categoryMap, type }: BreakdownDon
         if (!byCategory[name]) {
             byCategory[name] = { name, value: 0, icon, color }
         }
-        byCategory[name].value += t.amount
+        byCategory[name].value += type === 'expense' ? -signedMinor(t) / 100 : signedMinor(t) / 100
     }
 
     const preferredOrder = type === 'expense'
@@ -112,9 +113,4 @@ export function BreakdownDonut({ transactions, categoryMap, type }: BreakdownDon
             </div>
         </div>
     )
-}
-
-// Keep backward-compatible export
-export function ExpenseDonut({ transactions, categoryMap }: { transactions: Transaction[]; categoryMap: Map<string, Category>; currency: string }) {
-    return <BreakdownDonut transactions={transactions} categoryMap={categoryMap} type="expense" />
 }

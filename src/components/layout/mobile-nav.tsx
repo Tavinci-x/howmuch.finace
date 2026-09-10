@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/providers/auth-provider"
 
 const navItems = [
-  { href: "/", label: "Dashboard", emoji: "📊" },
+  { href: "/", label: "Overview", emoji: "📊" },
+  { href: "/transactions", label: "Transactions", emoji: "↕" },
   { href: "/reports", label: "Reports", emoji: "📈" },
   { href: "/settings", label: "Settings", emoji: "⚙️" },
 ]

@@ -82,6 +82,15 @@ export async function seedDatabase() {
         value: 'EUR',
       })
     }
+
+    if (await db.accounts.count() === 0) {
+      const now = new Date().toISOString()
+      await db.accounts.bulkAdd([
+        { id:'s-pankki-checking',name:'S-Pankki Everyday',institution:'S-Pankki',type:'checking',currency:'EUR',createdAt:now,updatedAt:now },
+        { id:'amex-card',name:'American Express',institution:'American Express',type:'credit_card',currency:'EUR',createdAt:now,updatedAt:now },
+        { id:'manual',name:'Manual entries',institution:'HowMuch',type:'other',currency:'EUR',createdAt:now,updatedAt:now },
+      ])
+    }
   } finally {
     seeding = false
   }

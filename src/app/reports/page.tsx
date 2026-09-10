@@ -9,6 +9,7 @@ import { getDateRange, getTrendPeriods } from "@/lib/utils"
 import { subMonths, startOfMonth, endOfMonth, differenceInDays } from "date-fns"
 import type { TimeRange } from "@/types"
 import { getIcon } from "@/lib/icons"
+import { isIncluded, signedMinor } from "@/lib/transactions"
 
 import { TimeRangeSelector } from "@/components/reports/time-range-selector"
 import { IncomeVsExpense } from "@/components/reports/income-vs-expense"
@@ -26,7 +27,8 @@ export default function ReportsPage() {
   const reportData = useMemo(() => {
     if (!allData) return null
 
-    const { transactions, categories } = allData
+    const { transactions:allTransactions, categories } = allData
+    const transactions = allTransactions.filter(isIncluded)
     const categoryMap = new Map(categories.map(c => [c.id, c]))
     const { start, end } = getDateRange(timeRange)
 
@@ -44,7 +46,7 @@ export default function ReportsPage() {
       const icon = cat?.icon || 'MoreHorizontal'
       const color = cat?.color || '#6b7280'
       if (!spendingMap[name]) spendingMap[name] = { name, value: 0, icon, color }
-      spendingMap[name].value += t.amount
+      spendingMap[name].value += -signedMinor(t) / 100
     }
     const spendingByCategory = Object.values(spendingMap).sort((a, b) => b.value - a.value)
 
@@ -55,15 +57,16 @@ export default function ReportsPage() {
     const periods = getTrendPeriods(timeRange, earliestTxn ? new Date(earliestTxn) : undefined)
     const incomeVsExpense = periods.map(period => {
       const periodTxns = transactions.filter(t => t.date.startsWith(period.key))
-      const income = periodTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-      const expenses = periodTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      const income = periodTxns.filter(t => t.type === 'income').reduce((s, t) => s + signedMinor(t), 0) / 100
+      const expenses = -periodTxns.filter(t => t.type === 'expense').reduce((s, t) => s + signedMinor(t), 0) / 100
       return { label: period.label, Income: income, Expenses: expenses }
     })
 
     // Summary stats
-    const totalIncome = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-    const totalExpenses = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-    const days = Math.max(1, differenceInDays(end, start) || 1)
+    const totalIncome = filtered.filter(t => t.type === 'income').reduce((s, t) => s + signedMinor(t), 0) / 100
+    const totalExpenses = -filtered.filter(t => t.type === 'expense').reduce((s, t) => s + signedMinor(t), 0) / 100
+    const effectiveEnd = end > new Date() ? new Date() : end
+    const days = Math.max(1, differenceInDays(effectiveEnd, start) + 1)
     const avgDailySpend = totalExpenses / days
 
     // Month-over-month change
@@ -71,14 +74,15 @@ export default function ReportsPage() {
     const thisMonthStart = startOfMonth(now)
     const thisMonthEnd = endOfMonth(now)
     const lastMonthStart = startOfMonth(subMonths(now, 1))
-    const lastMonthEnd = endOfMonth(subMonths(now, 1))
+    const lastMonthFullEnd = endOfMonth(subMonths(now, 1))
+    const lastMonthEnd = new Date(lastMonthStart.getFullYear(), lastMonthStart.getMonth(), Math.min(now.getDate(), lastMonthFullEnd.getDate()), 23, 59, 59)
 
     const thisMonthSpending = transactions
       .filter(t => t.type === 'expense' && new Date(t.date) >= thisMonthStart && new Date(t.date) <= thisMonthEnd)
-      .reduce((s, t) => s + t.amount, 0)
+      .reduce((s, t) => s + (-signedMinor(t) / 100), 0)
     const lastMonthSpending = transactions
       .filter(t => t.type === 'expense' && new Date(t.date) >= lastMonthStart && new Date(t.date) <= lastMonthEnd)
-      .reduce((s, t) => s + t.amount, 0)
+      .reduce((s, t) => s + (-signedMinor(t) / 100), 0)
 
     const monthOverMonthChange = lastMonthSpending > 0
       ? ((thisMonthSpending - lastMonthSpending) / lastMonthSpending) * 100

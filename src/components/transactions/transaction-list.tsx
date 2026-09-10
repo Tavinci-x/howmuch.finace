@@ -19,33 +19,38 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreVertical, Pencil, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { isIncluded, majorAmount, signedMinor } from "@/lib/transactions"
 
 export function TransactionList() {
   const { toast } = useToast()
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [accountFilter, setAccountFilter] = useState("all")
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [formOpen, setFormOpen] = useState(false)
 
   const data = useLiveQuery(async () => {
     const transactions = await db.transactions.orderBy('date').reverse().toArray()
-    const categories = await db.categories.toArray()
+    const [categories,accounts] = await Promise.all([db.categories.toArray(),db.accounts.toArray()])
     const categoryMap = new Map(categories.map(c => [c.id, c]))
+    const accountMap = new Map(accounts.map(a => [a.id, a]))
 
-    return transactions.map(t => ({
+    return transactions.filter(isIncluded).map(t => ({
       ...t,
       category: categoryMap.get(t.categoryId),
+      account: accountMap.get(t.accountId || 'manual'),
     }))
   })
 
   const filtered = data?.filter(t => {
     if (typeFilter !== "all" && t.type !== typeFilter) return false
     if (categoryFilter !== "all" && t.categoryId !== categoryFilter) return false
+    if (accountFilter !== "all" && t.accountId !== accountFilter) return false
     if (search) {
       const s = search.toLowerCase()
       return (
-        t.note.toLowerCase().includes(s) ||
+        (t.normalizedMerchant || t.note).toLowerCase().includes(s) ||
         t.category?.name.toLowerCase().includes(s) ||
         t.amount.toString().includes(s)
       )
@@ -54,7 +59,7 @@ export function TransactionList() {
   })
 
   async function handleDelete(id: string) {
-    await db.transactions.delete(id)
+    await db.transactions.update(id, { deletedAt:new Date().toISOString(), updatedAt:new Date().toISOString() })
     toast({ title: "Transaction deleted" })
   }
 
@@ -67,6 +72,8 @@ export function TransactionList() {
         onTypeFilterChange={setTypeFilter}
         categoryFilter={categoryFilter}
         onCategoryFilterChange={setCategoryFilter}
+        accountFilter={accountFilter}
+        onAccountFilterChange={setAccountFilter}
       />
 
       {!filtered || filtered.length === 0 ? (
@@ -94,19 +101,19 @@ export function TransactionList() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate">
-                      {t.category?.name || 'Unknown'}
+                      {t.normalizedMerchant || t.note || t.category?.name || 'Unknown'}
                     </span>
-                    <Badge variant={t.type === 'income' ? 'default' : 'secondary'} className="text-xs">
-                      {t.type}
+                    <Badge variant={signedMinor(t) > 0 ? 'default' : 'secondary'} className="text-xs">
+                      {t.kind || t.type}
                     </Badge>
                   </div>
                   <div className="text-xs text-muted-foreground flex gap-2">
                     <span>{formatDate(t.date)}</span>
-                    {t.note && <span>- {t.note}</span>}
+                    {t.account && <span>- {t.account.name}</span>}
                   </div>
                 </div>
-                <div className={`text-sm font-semibold shrink-0 ${t.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount, t.currency)}
+                <div className={`text-sm font-semibold shrink-0 ${signedMinor(t) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {signedMinor(t) > 0 ? '+' : '-'}{formatCurrency(majorAmount(t), t.currency)}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

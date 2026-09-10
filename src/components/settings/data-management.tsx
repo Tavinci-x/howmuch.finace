@@ -19,11 +19,15 @@ export function DataManagement() {
 
   async function handleExport() {
     const data = {
+      schemaVersion: 2,
       transactions: await db.transactions.toArray(),
       categories: await db.categories.toArray(),
       budgets: await db.budgets.toArray(),
       goals: await db.goals.toArray(),
       settings: await db.settings.toArray(),
+      accounts: await db.accounts.toArray(),
+      imports: await db.imports.toArray(),
+      merchantRules: await db.merchantRules.toArray(),
       exportedAt: new Date().toISOString(),
     }
 
@@ -44,27 +48,18 @@ export function DataManagement() {
     try {
       const text = await file.text()
       const data = JSON.parse(text)
-
-      if (data.transactions) {
-        await db.transactions.clear()
-        await db.transactions.bulkAdd(data.transactions)
-      }
-      if (data.categories) {
-        await db.categories.clear()
-        await db.categories.bulkAdd(data.categories)
-      }
-      if (data.budgets) {
-        await db.budgets.clear()
-        await db.budgets.bulkAdd(data.budgets)
-      }
-      if (data.goals) {
-        await db.goals.clear()
-        await db.goals.bulkAdd(data.goals)
-      }
-      if (data.settings) {
-        await db.settings.clear()
-        await db.settings.bulkAdd(data.settings)
-      }
+      if (!data || typeof data !== 'object' || !Array.isArray(data.transactions) || !Array.isArray(data.categories)) throw new Error('Unsupported backup')
+      await db.transaction('rw', [db.transactions, db.categories, db.budgets, db.goals, db.settings, db.accounts, db.imports, db.merchantRules], async () => {
+        await Promise.all([db.transactions.clear(),db.categories.clear(),db.budgets.clear(),db.goals.clear(),db.settings.clear(),db.accounts.clear(),db.imports.clear(),db.merchantRules.clear()])
+        if (data.transactions.length) await db.transactions.bulkAdd(data.transactions)
+        if (data.categories.length) await db.categories.bulkAdd(data.categories)
+        if (data.budgets?.length) await db.budgets.bulkAdd(data.budgets)
+        if (data.goals?.length) await db.goals.bulkAdd(data.goals)
+        if (data.settings?.length) await db.settings.bulkAdd(data.settings)
+        if (data.accounts?.length) await db.accounts.bulkAdd(data.accounts)
+        if (data.imports?.length) await db.imports.bulkAdd(data.imports)
+        if (data.merchantRules?.length) await db.merchantRules.bulkAdd(data.merchantRules)
+      })
 
       toast({ title: "Data imported successfully" })
     } catch {
@@ -90,6 +85,9 @@ export function DataManagement() {
     await db.budgets.clear()
     await db.goals.clear()
     await db.settings.clear()
+    await db.accounts.clear()
+    await db.imports.clear()
+    await db.merchantRules.clear()
     await seedDatabase()
     setShowConfirm(false)
     toast({ title: "All data cleared and defaults restored" })

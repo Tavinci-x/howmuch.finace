@@ -4,6 +4,9 @@ import { ThemeProvider } from "@/components/providers/theme-provider"
 import { AuthProvider } from "@/components/providers/auth-provider"
 import { AppShell } from "@/components/layout/app-shell"
 import { Toaster } from "@/components/ui/toaster"
+import localFont from "next/font/local"
+
+const ledgerMono = localFont({ src:"./fonts/GeistMonoVF.woff", variable:"--font-ledger-mono" })
 
 export const metadata: Metadata = {
   title: "HowMuch Finance",
@@ -20,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      <body className={ledgerMono.variable}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

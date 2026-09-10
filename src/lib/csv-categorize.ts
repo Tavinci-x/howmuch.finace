@@ -116,12 +116,10 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   ],
 }
 
-// Income category names — used to determine transaction type
-const INCOME_CATEGORIES = new Set(['Salary', 'Freelance', 'Gifts', 'Investments', 'Other Income'])
-
 interface CategorizeResult {
   categoryId: string
   type: 'income' | 'expense'
+  matched: boolean
 }
 
 /**
@@ -145,7 +143,10 @@ export function categorizeTransaction(
     categories.map(c => [c.name, c])
   )
 
-  // Try keyword matching
+  const type = amount >= 0 ? 'income' : 'expense'
+
+  // Category matching never changes cash-flow direction. This keeps refunds,
+  // reversals, and chargebacks from becoming expenses again.
   for (const [categoryName, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
     const cat = catByName.get(categoryName)
     if (!cat) continue
@@ -154,22 +155,24 @@ export function categorizeTransaction(
       if (descLower.includes(keyword)) {
         return {
           categoryId: cat.id,
-          type: INCOME_CATEGORIES.has(categoryName) ? 'income' : 'expense',
+          type,
+          matched: true,
         }
       }
     }
   }
 
   // No keyword match — use amount sign
-  const isIncome = amount > 0
+  const isIncome = amount >= 0
 
-  // Fallback category — salary is the most common income type
+  // Fallback category remains reviewable because no keyword matched.
   const fallback = isIncome
-    ? catByName.get('Salary') || catByName.get('Other Income')
+    ? catByName.get('Other Income') || catByName.get('Salary')
     : catByName.get('Other') || categories.find(c => c.type === 'expense')
 
   return {
     categoryId: fallback?.id || '',
     type: isIncome ? 'income' : 'expense',
+    matched: false,
   }
 }

@@ -75,15 +75,27 @@ export function QuickAdd() {
             return
         }
 
+        const now = new Date().toISOString()
+        const amountMinor = Math.round(numAmount * 100) * (type === 'income' ? 1 : -1)
         await db.transactions.add({
             id: uuidv4(),
             amount: numAmount,
+            amountMinor,
             type,
             categoryId,
+            accountId: 'manual',
             currency,
             date: format(new Date(), "yyyy-MM-dd"),
+            postedDate: format(new Date(), "yyyy-MM-dd"),
             note: "",
-            createdAt: new Date().toISOString(),
+            rawDescription: '',
+            normalizedMerchant: 'Manual entry',
+            kind: type === 'income' ? 'income' : 'purchase',
+            excludedFromAnalytics: false,
+            reviewStatus: 'reviewed',
+            categorizationConfidence: 1,
+            createdAt: now,
+            updatedAt: now,
         })
 
         // Reset form

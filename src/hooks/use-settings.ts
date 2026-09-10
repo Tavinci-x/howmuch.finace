@@ -12,5 +12,5 @@ export function useSetting(key: string): string | undefined {
 
 export function useDefaultCurrency(): string {
   const currency = useSetting('defaultCurrency')
-  return currency || 'USD'
+  return currency || 'EUR'
 }
