@@ -77,6 +77,7 @@ function detectSource(fileName:string,headers:string[]):ImportPreview['source'] 
 function cell(row:string[],index?:number){return index===undefined?'':String(row[index]??'').trim()}
 function applyMerchantRule(raw:string,rules:MerchantRule[]){const upper=raw.normalize('NFKC').toUpperCase().replace(/\s+/g,' ').trim();return [...rules].sort((a,b)=>b.priority-a.priority).find(rule=>rule.matchType==='exact'?upper===rule.pattern.toUpperCase():upper.includes(rule.pattern.toUpperCase()))}
 function categoryNamed(categories:Category[],name:string){return categories.find(category=>category.name.toLocaleLowerCase()===name.toLocaleLowerCase())}
+function isChrister(value:string){const words=value.normalize('NFKC').toLocaleLowerCase().split(/[^a-z\u00c0-\u024f]+/).filter(Boolean);return words.includes('christer')&&words.includes('tavi')}
 
 async function linesFromPdf(file:File):Promise<string[]>{
   const [pdfjs,workerModule]=await Promise.all([import('pdfjs-dist'),import('pdfjs-dist/build/pdf.worker.min.mjs?raw')]);const workerUrl=URL.createObjectURL(new Blob([workerModule.default],{type:'text/javascript'}));pdfjs.GlobalWorkerOptions.workerSrc=workerUrl;const document=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const lines:string[]=[]
@@ -93,7 +94,7 @@ async function parseAmexPdf(file:File,account:Account,categories:Category[],rule
   const dueLabelIndex=lines.findIndex(line=>/Eräpäivä\/Förfallodag/i.test(line));const dueLine=dueLabelIndex>=0?lines.slice(dueLabelIndex+1,dueLabelIndex+7).find(line=>/^\d{2}\.\d{2}\.\d{2}$/.test(line.trim())):undefined;const dueDate=dueLine?parseShortDate(dueLine):undefined
   const limitLabelIndex=lines.findIndex(line=>/Yhteenveto\/Summering.*Ostoraja\/Spenderingsgräns/i.test(line));const limitText=limitLabelIndex>=0?lines.slice(limitLabelIndex+1,limitLabelIndex+3).join(' '):'';const spendingLimitMinor=parseMinor(limitText.match(/\d{1,3}(?:,\d{3})+\.\d{2}/)?.[0]||'')??undefined
   const transactions:Transaction[]=[];const rejected:ImportPreview['rejected']=[];const occurrences=new Map<string,number>()
-  lines.forEach((line,rowIndex)=>{const match=line.match(/^(\d{2}\.\d{2}\.\d{2})\s+(\d{2}\.\d{2}\.\d{2})\s+(.+?)\s+(-?\s*[\d.]+,\d{2})$/);if(!match)return;const transactionDate=strictDate(match[1]);const postedDate=strictDate(match[2]);const statementMinor=parseMinor(match[4]);if(!transactionDate||!postedDate||statementMinor===null||statementMinor===0){rejected.push({row:rowIndex+1,reason:'Invalid Amex transaction row'});return}let payee=match[3].replace(/\s+/g,' ').trim();let originalAmountMinor:number|undefined;let originalCurrency:string|undefined;let exchangeRate:number|undefined;const foreign=payee.match(/^(.*?)\s+(-?[\d.,]+)\s+([A-Z]{3})$/);if(foreign){payee=foreign[1].trim();originalCurrency=foreign[3];const decimals=/^(JPY|KRW)$/.test(originalCurrency)?0:2;const statementOriginal=parseMinor(foreign[2],decimals);if(statementOriginal!==null){originalAmountMinor=-statementOriginal;exchangeRate=Math.abs(((-statementMinor)/100)/(originalAmountMinor/(10**decimals)))}}const amountMinor=-statementMinor;const upper=payee.toUpperCase();const payment=/MAKSUSUORITUS|BETALNING,? TACK/.test(upper);const fee=/JÄSENYYSMAKSU|MEDLEMSAVGIFT|SERVICE FEE/.test(upper);const learned=applyMerchantRule(payee,rules);const categorized=categorizeTransaction(payee,amountMinor,categories);const feeCategory=fee?categories.find(item=>/subscription|fee|jäsen/i.test(item.name)):undefined;const paymentCategory=payment?categoryNamed(categories,'Amex'):undefined;const categoryId=paymentCategory?.id||learned?.categoryId||feeCategory?.id||categorized.categoryId;const normalizedMerchant=payment?'American Express Payment':learned?.normalizedMerchant||normalizeMerchant(payee);const kind:Transaction['kind']=payment?'transfer':fee?'fee':amountMinor>0?'refund':'purchase';const confidence=payment||fee?1:learned?1:categorized.matched?.8:.35;const duplicateKey=[transactionDate,postedDate,amountMinor,normalizedMerchant].join('|');const occurrence=(occurrences.get(duplicateKey)||0)+1;occurrences.set(duplicateKey,occurrence);const externalTransactionId=`amex|${duplicateKey}|${occurrence}`;const now=new Date().toISOString();transactions.push({id:uuidv4(),amount:Math.abs(amountMinor)/100,amountMinor,type:kind==='refund'?'expense':amountMinor>=0?'income':'expense',categoryId,accountId:account.id,currency:'EUR',date:transactionDate,postedDate,note:normalizedMerchant,rawDescription:payee,normalizedMerchant,kind,externalTransactionId,fingerprint:createFingerprint({accountId:account.id,postedDate,amountMinor,currency:'EUR',rawDescription:payee,externalTransactionId}),fingerprintVersion:FINGERPRINT_VERSION,excludedFromAnalytics:kind==='transfer',reviewStatus:confidence>=.8?'reviewed':'needs_review',categorizationConfidence:confidence,originalAmountMinor,originalCurrency,exchangeRate,createdAt:now,updatedAt:now})})
+  lines.forEach((line,rowIndex)=>{const match=line.match(/^(\d{2}\.\d{2}\.\d{2})\s+(\d{2}\.\d{2}\.\d{2})\s+(.+?)\s+(-?\s*[\d.]+,\d{2})$/);if(!match)return;const transactionDate=strictDate(match[1]);const postedDate=strictDate(match[2]);const statementMinor=parseMinor(match[4]);if(!transactionDate||!postedDate||statementMinor===null||statementMinor===0){rejected.push({row:rowIndex+1,reason:'Invalid Amex transaction row'});return}let payee=match[3].replace(/\s+/g,' ').trim();let originalAmountMinor:number|undefined;let originalCurrency:string|undefined;let exchangeRate:number|undefined;const foreign=payee.match(/^(.*?)\s+(-?[\d.,]+)\s+([A-Z]{3})$/);if(foreign){payee=foreign[1].trim();originalCurrency=foreign[3];const decimals=/^(JPY|KRW)$/.test(originalCurrency)?0:2;const statementOriginal=parseMinor(foreign[2],decimals);if(statementOriginal!==null){originalAmountMinor=-statementOriginal;exchangeRate=Math.abs(((-statementMinor)/100)/(originalAmountMinor/(10**decimals)))}}const amountMinor=-statementMinor;const upper=payee.toUpperCase();const payment=/MAKSUSUORITUS|BETALNING,? TACK/.test(upper);const fee=/JÄSENYYSMAKSU|MEDLEMSAVGIFT|SERVICE FEE/.test(upper);const learned=applyMerchantRule(payee,rules);const categorized=categorizeTransaction(payee,amountMinor,categories);const feeCategory=fee?categories.find(item=>/subscription|fee|jäsen/i.test(item.name)):undefined;const paymentCategory=payment?categoryNamed(categories,'Amex'):undefined;const categoryId=paymentCategory?.id||learned?.categoryId||feeCategory?.id||categorized.categoryId;const normalizedMerchant=payment?'American Express Payment':learned?.normalizedMerchant||normalizeMerchant(payee);const kind:Transaction['kind']=payment?'refund':fee?'fee':amountMinor>0?'refund':'purchase';const confidence=payment||fee?1:learned?1:categorized.matched?.8:.35;const duplicateKey=[transactionDate,postedDate,amountMinor,normalizedMerchant].join('|');const occurrence=(occurrences.get(duplicateKey)||0)+1;occurrences.set(duplicateKey,occurrence);const externalTransactionId=`amex|${duplicateKey}|${occurrence}`;const now=new Date().toISOString();transactions.push({id:uuidv4(),amount:Math.abs(amountMinor)/100,amountMinor,type:kind==='refund'?'expense':amountMinor>=0?'income':'expense',categoryId,accountId:account.id,currency:'EUR',date:transactionDate,postedDate,note:normalizedMerchant,rawDescription:payee,normalizedMerchant,kind,externalTransactionId,fingerprint:createFingerprint({accountId:account.id,postedDate,amountMinor,currency:'EUR',rawDescription:payee,externalTransactionId}),fingerprintVersion:FINGERPRINT_VERSION,excludedFromAnalytics:false,reviewStatus:confidence>=.8?'reviewed':'needs_review',categorizationConfidence:confidence,originalAmountMinor,originalCurrency,exchangeRate,createdAt:now,updatedAt:now})})
   if(!transactions.length)throw new Error('No American Express transaction rows were found');const transactionChargeTotalMinor=-transactions.filter(item=>item.kind!=='transfer').reduce((sum,item)=>sum+(item.amountMinor||0),0);const newChargesMinor=summaryAmounts[2];const reconciliationDifferenceMinor=newChargesMinor===undefined?undefined:transactionChargeTotalMinor-newChargesMinor;const statement:StatementDetails={currency:'EUR',statementDate,periodStart:period.start,periodEnd:period.end,dueDate,openingBalanceMinor:summaryAmounts[0],paymentsCreditsMinor:summaryAmounts[1],newChargesMinor,closingBalanceMinor:summaryAmounts[3],amountDueMinor:summaryAmounts[4],spendingLimitMinor,transactionChargeTotalMinor,reconciliationDifferenceMinor,reconciled:reconciliationDifferenceMinor===0};return{source:'American Express',fileHash,transactions,rejected,statement}
 }
 
@@ -127,6 +128,7 @@ export async function parseBankStatement(file:File,account:Account,categories:Ca
     let confidence=learned?1:categorized.matched?0.8:0.35
 
     const ownTransfer=statementKind.includes('OMA TILISIIRTO')
+    const christerSelfTransfer=ownTransfer&&isChrister(payer)&&isChrister(payee)
     const amexPayment=amountMinor<0&&/\bAMERICAN EXPRESS\b/i.test(counterparty)
     const amexReimbursement=amountMinor>0&&/\bAMEX\s+MAKSU\b/i.test(message)
     const salary=amountMinor>0&&(/PALKKA/.test(statementKind)||/\bPALKKA\b/i.test(message))
@@ -135,15 +137,17 @@ export async function parseBankStatement(file:File,account:Account,categories:Ca
 
     if(ownTransfer){
       categoryId=categoryNamed(categories,'Transfers')?.id||categoryId
-      normalizedMerchant='Own Transfer'
-      kind='transfer';excludedFromAnalytics=true;confidence=1
+      normalizedMerchant=`${normalizeMerchant(payer)} → ${normalizeMerchant(payee)}`
+      kind=christerSelfTransfer?'transfer':amountMinor>0?'income':'purchase'
+      excludedFromAnalytics=christerSelfTransfer
+      confidence=christerSelfTransfer?1:0.65
     }else if(amexPayment){
       categoryId=categoryNamed(categories,'Amex')?.id||categoryId
       normalizedMerchant='American Express'
       kind='purchase';excludedFromAnalytics=false;confidence=1
     }else if(amexReimbursement){
       categoryId=categoryNamed(categories,'Reimbursements')?.id||categoryId
-      kind='transfer';excludedFromAnalytics=true;confidence=1
+      kind='income';excludedFromAnalytics=false;confidence=1
     }else if(salary){
       categoryId=categoryNamed(categories,'Salary')?.id||categoryId
       kind='income';confidence=1
@@ -153,7 +157,7 @@ export async function parseBankStatement(file:File,account:Account,categories:Ca
       kind='purchase';confidence=1
     }else if(investmentTransfer){
       categoryId=categoryNamed(categories,'Investments')?.id||categoryId
-      kind='transfer';excludedFromAnalytics=true;confidence=1
+      kind=amountMinor>0?'income':'purchase';excludedFromAnalytics=false;confidence=1
     }else if(/KÄTEISNOSTO|CASH WITHDRAWAL/.test(statementKind)){
       kind='withdrawal'
     }else if(/PALVELUMAKSU|SERVICE FEE/.test(statementKind)){

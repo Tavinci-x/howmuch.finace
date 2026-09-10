@@ -12,7 +12,7 @@ export function majorAmount(transaction: Transaction): number {
 }
 
 export function isIncluded(transaction: Transaction): boolean {
-  return !transaction.deletedAt && !transaction.excludedFromAnalytics && transaction.kind !== 'transfer'
+  return !transaction.deletedAt && !transaction.excludedFromAnalytics
 }
 
 export function isVisible(transaction: Transaction): boolean {

@@ -53,7 +53,7 @@ export function CsvImport({open,onOpenChange}:CsvImportProps){
       const refreshed=preview.transactions.flatMap(tx=>{
         if(!tx.fingerprint)return[]
         const current=existingByFingerprint.get(tx.fingerprint)
-        const ruleManaged=tx.normalizedMerchant==='Own Transfer'||tx.normalizedMerchant==='American Express'
+        const ruleManaged=tx.normalizedMerchant?.includes('→')||tx.normalizedMerchant==='American Express'||tx.normalizedMerchant==='American Express Payment'||tx.normalizedMerchant==='Paymonade'||tx.rawDescription?.toLocaleUpperCase().includes('AMEX MAKSU')
         if(!current||((current.categorizationConfidence??0)>=1&&!ruleManaged))return[]
         return [{...current,categoryId:tx.categoryId,normalizedMerchant:tx.normalizedMerchant,note:tx.note,rawDescription:tx.rawDescription,kind:tx.kind,type:tx.type,excludedFromAnalytics:tx.excludedFromAnalytics,reviewStatus:tx.reviewStatus,categorizationConfidence:tx.categorizationConfidence,updatedAt:new Date().toISOString()}]
       })
